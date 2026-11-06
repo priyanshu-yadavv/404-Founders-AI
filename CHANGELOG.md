@@ -5,6 +5,50 @@ All notable changes to the 404 FOUNDERS project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to Phase-based Development Governance.
 
+## [Phase-07] - 2026-11-06
+
+### Added
+- **12 Specialized Modular Intelligence Engines:**
+  - `LogicalReasoningEngine` (`core/reasoning/logical.py`): Structured problem decomposition, assumption extraction, contradiction detection across polarities, formal deductive step tracking (Modus Ponens), candidate comparison, and epistemic uncertainty quantification ($[0.0, 1.0]$).
+  - `MathematicalReasoningEngine` (`core/reasoning/mathematical.py`): Deterministic arithmetic with token sanitation, linear equation solver ($ax + b = c$), quadratic equation solver ($ax^2 + bx + c = 0$ with real/complex roots), 2x2 linear systems via Cramer's rule, numerical differentiation (central difference $O(h^2)$), numerical integration (Simpson's 1/3 rule $O(h^4)$), vector/matrix algebra, probability/statistics, and automated residual verification.
+  - `ScientificReasoningEngine` (`core/reasoning/scientific.py`): 1D constant acceleration kinematics, Ohm's law and power dissipation, Ideal Gas Law, hypothesis evaluation with falsifiability criteria, empirical dataset comparison, and strict hallucination-free citation tracking.
+  - `CodingIntelligenceEngine` (`personal_ai/coding_assistant/coding_engine.py`): Multi-language detection (Python, Rust, C++, TypeScript, JS, Java, SQL), defensive Python AST parsing, code smells (mutable defaults, bare except), algorithmic Big-O complexity estimation, and mandatory `SandboxExecutionNotice` prohibiting automatic code execution without explicit human approval.
+  - `CybersecurityIntelligenceEngine` (`personal_ai/cybersecurity/cyber_engine.py`): Defensive policy rejection of offensive exploits, credential harvesting, and reverse shells; Shannon entropy calculation for packed/obfuscated files; log pattern analysis for SQLi, XSS, path traversal, and brute force; exact CVSS 3.1 base score computation; and hardening recommendations.
+  - `CriticalThinkingEngine` (`core/reasoning/critical.py`): Rhetorical fallacy detection (Ad Hominem, False Dilemma, Slippery Slope, Appeal to Authority, Post Hoc, Bandwagon), cognitive bias identification (Confirmation Bias, Anchoring, Sunk Cost), evidence quality evaluation, and alternative interpretation synthesis.
+  - `CreativeProblemSolvingEngine` (`core/reasoning/creative.py`): Problem inversion, cross-domain analogies (immunological memory, civil hydraulic surge tanks, forest mycelial networks), systematic constraint relaxation, and divergent solution vectors.
+  - `ResearchAnalysisEngine` (`core/intelligence/research_engine.py`): Multi-source claim extraction, cross-document contradiction detection across opposing polarities, corroboration scoring across independent sources, and strict source attribution.
+  - `PlanningDecisionEngine` (`agent/planner/planning_engine.py`): Goal decomposition into subtasks, topological DAG sequencing via Kahn's algorithm with cycle detection, permission tier risk classification (`read_only` to `dangerous`), and mandatory human approval checkpoints for irreversible actions.
+  - `SelfEvaluationEngine` (`core/intelligence/self_evaluation.py`): Output consistency audits, contradiction scanning, unsupported absolute claim detection, epistemic modesty declaration (`UNKNOWN_DECLARED`), and structured JSONL feedback logging for offline training review (zero live weight modification).
+  - `LanguageCommunicationEngine` (`core/intelligence/language_engine.py`): Communication style adaptation (`TECHNICAL_PRECISE`, `EXECUTIVE_CONCISE`, `TUTORIAL_EDUCATIONAL`, `SYSTEM_OPERATIONAL`, `CASUAL_DIRECT`), Flesch-Kincaid readability scoring, and extractive executive summarization.
+  - `GeneralKnowledgeEngine` (`core/intelligence/knowledge_engine.py`): Named entity extraction with polysemous disambiguation, academic/engineering domain classification, and epistemic boundaries enforcement (blocking speculative future predictions and credential access).
+- **Central Intelligence Router (`core/intelligence/central_router.py`):**
+  - Unified coordinator connecting all 12 modules through existing `DynamicRouter`.
+  - Intent classification mapping queries to primary and secondary engine targets.
+  - Multi-engine composite pipelines (e.g. Code Analysis + Cybersecurity Triage).
+  - Cross-module conflict resolution and graceful fallback handling.
+- **REST API Endpoints (`api/rest/routes.py`, `api/rest/schemas.py`):**
+  - `GET /api/v1/intelligence/modules`: Status and metadata of all 12 modules.
+  - `POST /api/v1/intelligence/query`: Dynamic multi-engine dispatch.
+  - `POST /api/v1/intelligence/logical`: Formal logical deduction.
+  - `POST /api/v1/intelligence/math`: Deterministic mathematical computation.
+  - `POST /api/v1/intelligence/coding`: Defensive code analysis and complexity.
+  - `POST /api/v1/intelligence/security`: Defensive cybersecurity audit and log analysis.
+  - `POST /api/v1/intelligence/plan`: Goal decomposition and DAG sequencing.
+  - `POST /api/v1/intelligence/self_evaluate`: Consistency and error verification.
+- **Developer CLI Utility (`scripts/run_intelligence.py`):**
+  - Interactive command-line driver supporting direct engine queries, dynamic router dispatch, JSON output, and module inspection.
+- **8 Technical Architecture Manuals in `docs/`:**
+  - `docs/LOGICAL_REASONING.md`
+  - `docs/MATHEMATICAL_INTELLIGENCE.md`
+  - `docs/CODING_INTELLIGENCE.md`
+  - `docs/CYBERSECURITY_INTELLIGENCE.md`
+  - `docs/SCIENTIFIC_RESEARCH_INTELLIGENCE.md`
+  - `docs/PLANNING_DECISION_MAKING.md`
+  - `docs/CENTRAL_INTELLIGENCE_ROUTER.md`
+  - `docs/SELF_EVALUATION_ERROR_DETECTION.md`
+- **Comprehensive Test Suite (72 New Tests in `tests/intelligence/` and `tests/api/`):**
+  - Total test count expanded to 197 automated tests (100% passing on CPU).
+
 ## [Phase-06] - 2026-11-06
 
 ### Added

@@ -395,3 +395,139 @@ Authored 8 comprehensive technical manuals in `docs/`:
 - Executed full test suite: **125 passed in 4.82s (100% success rate on CPU)**.
 - Verified 10/10 preflight checks pass cleanly via `scripts/validate_training.py`.
 - Staged all Phase 06 files awaiting user review.
+
+
+---
+
+## [2026-11-06T23:38:00+05:30] — Phase 07: Modular Intelligence Engines & Routing
+
+### 1. Architectural Scope & Mandate
+- **Role**: Principal AI Research Scientist and Modular Intelligence Systems Engineer.
+- **System Focus**: Development of the 12 specialized modular intelligence engines and Central Intelligence Router for 404 FOUNDERS.
+- **Strict Invariants Preserved**:
+  - Zero pretrained weights (foundation model starts from random initialization).
+  - Strictly no automatic code execution (isolated behind permission-controlled sandbox barrier).
+  - Authorized defensive cybersecurity only (zero exploit payload generation, credential harvesting, or stealth persistence).
+  - Zero citation fabrication or unverified external claims.
+  - Mandatory human operator approval checkpoints for sensitive or irreversible actions.
+  - Zero live model weight self-modification (evaluation logs stored for offline training review).
+
+### 2. Implemented Intelligence Engines (12 Modules)
+1. **Logical Reasoning Engine (`core/reasoning/logical.py`):**
+   - Decomposes multi-stage propositions.
+   - Extracts explicit and domain boundary assumptions.
+   - Identifies semantic contradictions and mutual exclusions.
+   - Executes formal Modus Ponens and hypothesis verification.
+   - Evaluates candidate solutions against constraints.
+   - Quantifies epistemic uncertainty in $[0.0, 1.0]$.
+2. **Mathematical Reasoning Engine (`core/reasoning/mathematical.py`):**
+   - Deterministic arithmetic with input token sanitation.
+   - Exact linear equation solver ($ax + b = c$) and quadratic solver ($ax^2 + bx + c = 0$) with real and complex roots.
+   - $2\times 2$ linear system solver via Cramer's rule.
+   - Numerical differentiation via central differences ($O(h^2)$).
+   - Numerical integration via Simpson's 1/3 rule ($O(h^4)$).
+   - Linear algebra: vector dot products, norms, matrix multiplication, determinants, and $2\times 2$ analytical inversion.
+   - Geometry, trigonometry, and probability/statistics with automated numerical verification residuals.
+3. **Scientific Reasoning Engine (`core/reasoning/scientific.py`):**
+   - Constant acceleration kinematics ($v = u + at, s = ut + \frac{1}{2}at^2, v^2 = u^2 + 2as$).
+   - Electrodynamics (Ohm's law $V = IR, P = VI = I^2R$).
+   - Thermodynamics (Ideal Gas Law $PV = nRT$).
+   - Hypothesis evaluation with variable isolation and falsifiability criteria.
+   - Empirical dataset comparison and divergence scoring.
+   - Strict hallucination-free citation tracking (grounded in provided sources only).
+4. **Coding Intelligence Engine (`personal_ai/coding_assistant/coding_engine.py`):**
+   - Multi-language detection (Python, Rust, C++, TypeScript, JavaScript, Java, SQL).
+   - Defensive Python AST parsing and syntax validation.
+   - Detection of code smells (mutable default arguments, bare `except:`).
+   - Algorithmic Big-O time and space complexity estimation.
+   - Mandatory `SandboxExecutionNotice` prohibiting automatic code execution without explicit human approval.
+5. **Cybersecurity Intelligence Engine (`personal_ai/cybersecurity/cyber_engine.py`):**
+   - Defensive policy rejection of offensive exploits, credential theft, and reverse shells.
+   - Shannon entropy calculation for obfuscated payload detection ($H > 6.8$).
+   - Server and system log analysis for SQLi, XSS, directory traversal, and brute-force attacks.
+   - Exact CVSS 3.1 base score computation and vector string generation.
+   - Hardening and mitigation recommendations.
+6. **Critical Thinking Engine (`core/reasoning/critical.py`):**
+   - Rhetorical fallacy detection (Ad Hominem, False Dilemma, Slippery Slope, Appeal to Authority, Post Hoc, Bandwagon).
+   - Cognitive bias identification (Confirmation Bias, Anchoring, Sunk Cost Fallacy).
+   - Empirical evidence quality and sample adequacy evaluation.
+   - Counter-hypothesis and alternative interpretation synthesis.
+7. **Creative Problem-Solving Engine (`core/reasoning/creative.py`):**
+   - Problem inversion (formulating conditions that maximize failure modes).
+   - Cross-domain analogies (immunological memory, civil hydraulic surge tanks, forest mycelial networks).
+   - Systematic constraint relaxation.
+   - Divergent solution vector synthesis with feasibility and novelty ratings.
+8. **Research & Knowledge Analysis Engine (`core/intelligence/research_engine.py`):**
+   - Multi-source document claim extraction.
+   - Cross-document contradiction detection across opposing polarities.
+   - Corroboration scoring across independent sources.
+   - Zero-hallucination citation provenance.
+9. **Planning & Decision-Making Engine (`agent/planner/planning_engine.py`):**
+   - Goal decomposition into discrete subtasks.
+   - Topological dependency sequencing via Kahn's algorithm with cycle detection.
+   - Permission tier risk classification (`READ_ONLY`, `PROTECTED`, `PRIVILEGED`, `DANGEROUS`).
+   - Mandatory human operator approval checkpoints for irreversible actions (`grant_approval()`).
+   - Strategic alternative approach comparisons.
+10. **Self-Evaluation & Error Detection Engine (`core/intelligence/self_evaluation.py`):**
+    - Internal contradiction scanning.
+    - Unsupported absolute claim detection.
+    - Missing calculation and explanatory information audits.
+    - Epistemic modesty status (`UNKNOWN_DECLARED`).
+    - Structured JSONL feedback logging for offline training review (zero live weight updates).
+11. **Language & Communication Engine (`core/intelligence/language_engine.py`):**
+    - Communication style adaptation (`TECHNICAL_PRECISE`, `EXECUTIVE_CONCISE`, `TUTORIAL_EDUCATIONAL`, `SYSTEM_OPERATIONAL`, `CASUAL_DIRECT`).
+    - Quantitative readability scoring: Flesch Reading Ease and Flesch-Kincaid Grade Level.
+    - Extractive executive summarization and key takeaways.
+12. **General Knowledge Processing Engine (`core/intelligence/knowledge_engine.py`):**
+    - Entity extraction with polysemous disambiguation cues.
+    - Academic and engineering domain classification.
+    - Epistemic boundaries enforcement (rejecting speculative future predictions and credential access).
+
+### 3. Central Intelligence Router (`core/intelligence/central_router.py`)
+- Coordinates all 12 modular engines through the existing `DynamicRouter`.
+- Intent classification with primary and secondary engine targeting.
+- Composite multi-engine pipeline execution (e.g. Code Analysis + Security Triage).
+- Cross-module conflict detection and graceful fallback handling.
+
+### 4. REST API Services & CLI Tooling
+- **REST Endpoints (`api/rest/routes.py`):**
+  - `GET /api/v1/intelligence/modules`: Status and responsibilities of all 12 modules.
+  - `POST /api/v1/intelligence/query`: Central Intelligence Router dynamic dispatch.
+  - `POST /api/v1/intelligence/logical`: Logical deduction and decomposition.
+  - `POST /api/v1/intelligence/math`: Deterministic mathematical computation.
+  - `POST /api/v1/intelligence/coding`: Defensive code inspection and complexity.
+  - `POST /api/v1/intelligence/security`: Defensive security audit and log triage.
+  - `POST /api/v1/intelligence/plan`: Goal decomposition and DAG sequencing.
+  - `POST /api/v1/intelligence/self_evaluate`: Output quality and modesty verification.
+- **Developer CLI (`scripts/run_intelligence.py`):**
+  - Interactive and scriptable driver with `--query`, `--engine`, `--list-modules`, and `--json`.
+
+### 5. Documentation Authored
+Authored 8 comprehensive technical specifications in `docs/`:
+- [`docs/LOGICAL_REASONING.md`](docs/LOGICAL_REASONING.md)
+- [`docs/MATHEMATICAL_INTELLIGENCE.md`](docs/MATHEMATICAL_INTELLIGENCE.md)
+- [`docs/CODING_INTELLIGENCE.md`](docs/CODING_INTELLIGENCE.md)
+- [`docs/CYBERSECURITY_INTELLIGENCE.md`](docs/CYBERSECURITY_INTELLIGENCE.md)
+- [`docs/SCIENTIFIC_RESEARCH_INTELLIGENCE.md`](docs/SCIENTIFIC_RESEARCH_INTELLIGENCE.md)
+- [`docs/PLANNING_DECISION_MAKING.md`](docs/PLANNING_DECISION_MAKING.md)
+- [`docs/CENTRAL_INTELLIGENCE_ROUTER.md`](docs/CENTRAL_INTELLIGENCE_ROUTER.md)
+- [`docs/SELF_EVALUATION_ERROR_DETECTION.md`](docs/SELF_EVALUATION_ERROR_DETECTION.md)
+
+### 6. Automated Testing & Verification
+- Authored 72 new tests across 14 test modules in `tests/intelligence/` and `tests/api/`:
+  - `tests/intelligence/test_central_router.py` (4 tests)
+  - `tests/intelligence/test_coding_intelligence.py` (5 tests)
+  - `tests/intelligence/test_creative_problem_solving.py` (4 tests)
+  - `tests/intelligence/test_critical_thinking.py` (5 tests)
+  - `tests/intelligence/test_cybersecurity_intelligence.py` (6 tests)
+  - `tests/intelligence/test_knowledge_engine.py` (3 tests)
+  - `tests/intelligence/test_language_engine.py` (3 tests)
+  - `tests/intelligence/test_logical_reasoning.py` (6 tests)
+  - `tests/intelligence/test_mathematical_reasoning.py` (10 tests)
+  - `tests/intelligence/test_planning_engine.py` (3 tests)
+  - `tests/intelligence/test_research_engine.py` (4 tests)
+  - `tests/intelligence/test_scientific_reasoning.py` (6 tests)
+  - `tests/intelligence/test_self_evaluation.py` (5 tests)
+  - `tests/api/test_intelligence_endpoints.py` (8 tests)
+- Executed entire test suite: **197 passed in 4.96s (100% success rate on CPU)**.
+- Staged all Phase 07 files awaiting user review.

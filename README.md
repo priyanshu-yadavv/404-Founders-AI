@@ -142,9 +142,9 @@ The system operates across two core modes:
 ├── security/                 # Zero-trust policy, audit logger & sanitization
 ├── configs/                  # YAML system configurations, tokenizer & cluster tiers
 ├── frontend/                 # Client interfaces (React / Next.js / Tauri)
-├── scripts/                  # Developer CLI tools (system, gpu, env, storage, tokenizer)
-├── tests/                    # 98 automated tests covering all subsystems
-└── docs/                     # 29 exhaustive technical architecture manuals
+├── scripts/                  # Developer CLI tools (system, gpu, env, storage, tokenizer, training, intelligence)
+├── tests/                    # 197 automated tests covering all subsystems
+└── docs/                     # 37 exhaustive technical architecture manuals
 ```
 
 ---
@@ -279,22 +279,62 @@ Complete architectural specifications are maintained in [`docs/`](docs/):
 17. [**Neural Routing Design**](docs/NEURAL_ROUTING_DESIGN.md) (`DOC-ROUTE-001`): Rule-based, learned top-$k$ MoE, and dynamic hybrid routing architectures.
 18. [**Model Initialization**](docs/MODEL_INITIALIZATION.md) (`DOC-INIT-001`): Pure random Gaussian parameter initialization, deterministic seeding, and parameter census.
 
+### Modular Intelligence Architecture (Phase 07)
+19. [**Logical Reasoning Engine**](docs/LOGICAL_REASONING.md) (`DOC-INTEL-001`): Deductive chains, assumption extraction, contradiction detection, and uncertainty scoring.
+20. [**Mathematical Reasoning Engine**](docs/MATHEMATICAL_INTELLIGENCE.md) (`DOC-INTEL-002`): Deterministic arithmetic, algebra, calculus, and matrix routines with numerical verification.
+21. [**Coding Intelligence Engine**](docs/CODING_INTELLIGENCE.md) (`DOC-INTEL-003`): AST parsing, multi-language detection, complexity analysis, and strict sandbox execution boundaries.
+22. [**Cybersecurity Intelligence Engine**](docs/CYBERSECURITY_INTELLIGENCE.md) (`DOC-INTEL-004`): Defensive log analysis, file entropy, CVSS 3.1 scoring, and hardening guidelines.
+23. [**Scientific & Research Intelligence**](docs/SCIENTIFIC_RESEARCH_INTELLIGENCE.md) (`DOC-INTEL-005`): Physics laws, hypothesis falsifiability, multi-source synthesis, and citation provenance.
+24. [**Planning & Decision-Making Engine**](docs/PLANNING_DECISION_MAKING.md) (`DOC-INTEL-006`): Topological DAG decomposition, risk tiers, and operator approval gating.
+25. [**Central Intelligence Router**](docs/CENTRAL_INTELLIGENCE_ROUTER.md) (`DOC-INTEL-007`): Dynamic routing, multi-engine composite execution, and conflict resolution.
+26. [**Self-Evaluation & Error Detection**](docs/SELF_EVALUATION_ERROR_DETECTION.md) (`DOC-INTEL-008`): Consistency audits, epistemic modesty ("I don't know"), and offline feedback logging.
+
 ### System Architecture & Governance (Phase 01 & 02)
-19. [**System Architecture**](docs/SYSTEM_ARCHITECTURE.md) (`DOC-ARCH-001`): Operating modes, orchestration, and data flow.
-20. [**Neural Architecture**](docs/NEURAL_ARCHITECTURE.md) (`DOC-ARCH-002`): Layers, RoPE, SwiGLU, MMA attention, and MoE routing.
-21. [**Multimodal Architecture**](docs/MULTIMODAL_ARCHITECTURE.md) (`DOC-ARCH-003`): Vision, audio, video, text, and documents fusion.
-22. [**Memory Architecture**](docs/MEMORY_ARCHITECTURE.md) (`DOC-ARCH-004`): Multi-tier memory, infinite context, and consolidation.
-23. [**Personal AI Architecture**](docs/PERSONAL_AI_ARCHITECTURE.md) (`DOC-ARCH-005`): OS copilot, telemetry, coding, and defensive cybersecurity.
-24. [**API Architecture**](docs/API_ARCHITECTURE.md) (`DOC-ARCH-006`): REST, WebSocket, and gRPC protocol specifications.
-25. [**Security Architecture**](docs/SECURITY_ARCHITECTURE.md) (`DOC-ARCH-007`): Threat model, 4-tier permissions, audit logging, and sandbox.
-26. [**Data Architecture**](docs/DATA_ARCHITECTURE.md) (`DOC-ARCH-008`): Streaming ETL, MinHash deduplication, and binary sharding.
-27. [**Infrastructure Architecture**](docs/INFRASTRUCTURE_ARCHITECTURE.md) (`DOC-ARCH-009`): Hybrid local, cloud, and GPU cluster targets.
-28. [**Development Standards**](docs/DEVELOPMENT_STANDARDS.md) (`DOC-STANDARDS-001`): Code formatting, typing, logging, and exceptions.
-29. [**Hardware Assessment Report**](docs/phase-01-hardware-assessment.md) (`DOC-PHASE01-SYS-001`): Physical host telemetry on Dell Latitude 5400.
+27. [**System Architecture**](docs/SYSTEM_ARCHITECTURE.md) (`DOC-ARCH-001`): Operating modes, orchestration, and data flow.
+28. [**Neural Architecture**](docs/NEURAL_ARCHITECTURE.md) (`DOC-ARCH-002`): Layers, RoPE, SwiGLU, MMA attention, and MoE routing.
+29. [**Multimodal Architecture**](docs/MULTIMODAL_ARCHITECTURE.md) (`DOC-ARCH-003`): Vision, audio, video, text, and documents fusion.
+30. [**Memory Architecture**](docs/MEMORY_ARCHITECTURE.md) (`DOC-ARCH-004`): Multi-tier memory, infinite context, and consolidation.
+31. [**Personal AI Architecture**](docs/PERSONAL_AI_ARCHITECTURE.md) (`DOC-ARCH-005`): OS copilot, telemetry, coding, and defensive cybersecurity.
+32. [**API Architecture**](docs/API_ARCHITECTURE.md) (`DOC-ARCH-006`): REST, WebSocket, and gRPC protocol specifications.
+33: [**Security Architecture**](docs/SECURITY_ARCHITECTURE.md) (`DOC-ARCH-007`): Threat model, 4-tier permissions, audit logging, and sandbox.
+34. [**Data Architecture**](docs/DATA_ARCHITECTURE.md) (`DOC-ARCH-008`): Streaming ETL, MinHash deduplication, and binary sharding.
+35. [**Infrastructure Architecture**](docs/INFRASTRUCTURE_ARCHITECTURE.md) (`DOC-ARCH-009`): Hybrid local, cloud, and GPU cluster targets.
+36. [**Development Standards**](docs/DEVELOPMENT_STANDARDS.md) (`DOC-STANDARDS-001`): Code formatting, typing, logging, and exceptions.
+37. [**Hardware Assessment Report**](docs/phase-01-hardware-assessment.md) (`DOC-PHASE01-SYS-001`): Physical host telemetry on Dell Latitude 5400.
 
 ---
 
-## 8. Development Roadmap & Phase Status
+## 8. Modular Intelligence System (Phase 07)
+
+The 404 FOUNDERS modular intelligence system integrates 12 specialized engines through the Central Intelligence Router:
+
+```mermaid
+flowchart TD
+    UserQuery["User / System Query"] --> CIR["Central Intelligence Router<br/>(DynamicRouter + Intent Classifier)"]
+    
+    subgraph ENGINES ["12 Specialized Intelligence Engines"]
+        E1["Logical Reasoning Engine"]
+        E2["Mathematical Reasoning Engine"]
+        E3["Scientific Reasoning Engine"]
+        E4["Coding Intelligence Engine (Sandbox Barricaded)"]
+        E5["Cybersecurity Intelligence Engine (Defensive Only)"]
+        E6["Critical Thinking Engine"]
+        E7["Creative Problem-Solving Engine"]
+        E8["Research & Knowledge Analysis Engine"]
+        E9["Planning & Decision Engine (Human Gate Checkpoint)"]
+        E10["Self-Evaluation & Error Detection Engine"]
+        E11["Language & Communication Engine"]
+        E12["General Knowledge Processing Engine"]
+    end
+    
+    CIR -->|Dispatch Intent / Composite| ENGINES
+    ENGINES --> Merge["Conflict Resolution & Output Reconciler"]
+    Merge --> Resp["Structured Multi-Engine Response"]
+```
+
+---
+
+## 9. Development Roadmap & Phase Status
 
 | Phase | Phase Name | Status |
 |---|---|---|
@@ -303,13 +343,13 @@ Complete architectural specifications are maintained in [`docs/`](docs/):
 | **Phase 03** | Core AI Foundation Development | **Completed** |
 | **Phase 04** | Custom BPE Tokenizer & Data Pipeline | **Completed** |
 | **Phase 05** | Training Infrastructure & GPU Cluster Architecture | **Completed** |
-| **Phase 06** | **Foundation Model Pretraining from Random Initialization** | **Completed (Review Pending)** |
-| Phase 07 | Personal AI Assistant & OS Intelligence | Planned |
-| Phase 08 | Tri-Protocol API Services & Production Release | Planned |
+| **Phase 06** | Foundation Model Pretraining from Random Initialization | **Completed** |
+| **Phase 07** | **Intelligence Modules** | **Completed (Review Pending)** |
+| Phase 08 | Multimodal Intelligence & Cross-Modal Fusion | Planned |
 
 ---
 
-## 9. Quickstart, Localhost Testing & Verification
+## 10. Quickstart, Localhost Testing & Verification
 
 ### Localhost Application Execution
 
@@ -342,10 +382,16 @@ node frontend/server.js
 ### Automated Tests & CLI Diagnostics
 
 ```bash
-# 1. Run complete automated test suite (125 tests) on CPU
+# 1. Run complete automated test suite (197 tests) on CPU
 .venv/bin/python -m pytest tests/
 
-# 2. Execute 10-step Pre-Flight Training Verification Suite
+# 2. Interact with the 12 Modular Intelligence Engines via CLI
+.venv/bin/python scripts/run_intelligence.py --list-modules
+.venv/bin/python scripts/run_intelligence.py --query "calculate 42 * (15 + 3)"
+.venv/bin/python scripts/run_intelligence.py --query "analyze python code: def factorial(n): return 1 if n<=1 else n*factorial(n-1)"
+.venv/bin/python scripts/run_intelligence.py --query "plan production database deployment with subtasks"
+
+# 3. Execute 10-step Pre-Flight Training Verification Suite
 .venv/bin/python scripts/validate_training.py
 
 # 3. Model initialization from random weights & parameter auditing

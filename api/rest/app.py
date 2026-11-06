@@ -15,6 +15,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.rest.routes import router
+from core.intelligence.central_router import CentralIntelligenceRouter
 from core.intelligence.neural_core import NeuralCore, NeuralCoreConfig
 from neural_architecture.inference import InferenceEngine
 from tokenizer import CustomBPETokenizer
@@ -43,11 +44,13 @@ def initialize_runtime_services() -> Dict[str, Any]:
     )
     neural_model = NeuralCore(config=core_cfg)
     inference_engine = InferenceEngine(model=neural_model)
+    central_router = CentralIntelligenceRouter(d_model=core_cfg.d_model)
 
     return {
         "tokenizer": tokenizer,
         "neural_model": neural_model,
         "inference_engine": inference_engine,
+        "central_router": central_router,
         "start_time": time.time(),
     }
 

@@ -14,6 +14,8 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from api.rest.schemas import (
+    CodingAnalysisRequest,
+    CodingAnalysisResponse,
     CommandValidationRequest,
     CommandValidationResponse,
     DecodeRequest,
@@ -21,14 +23,27 @@ from api.rest.schemas import (
     HealthResponse,
     InferenceRequest,
     InferenceResponse,
+    IntelligenceQueryRequest,
+    IntelligenceQueryResponse,
+    LogicalReasoningRequest,
+    LogicalReasoningResponse,
+    MathReasoningRequest,
+    MathReasoningResponse,
     PhaseStatusResponse,
+    PlanningRequest,
+    PlanningResponse,
     PromptSafetyRequest,
     PromptSafetyResponse,
+    SecurityAuditRequest,
+    SecurityAuditResponse,
+    SelfEvaluationRequest,
+    SelfEvaluationResponse,
     TelemetryResponse,
     TokenizeRequest,
     TokenizeResponse,
 )
 from core.exceptions import SecurityViolationError
+from core.intelligence.central_router import CentralIntelligenceRouter
 from core.intelligence.neural_core import NeuralCore, NeuralCoreConfig
 from infrastructure.gpu_cluster import ClusterCatalog
 from infrastructure.local import LocalHardwareInspector, LocalRuntimeManager
@@ -42,7 +57,12 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
 def get_server_state(request: Request) -> Dict[str, Any]:
     """Retrieves shared application state (models, tokenizers, uptime)."""
-    return request.app.state.services
+    if hasattr(request.app.state, "services") and request.app.state.services is not None:
+        return request.app.state.services
+    from api.rest.app import initialize_runtime_services
+    services = initialize_runtime_services()
+    request.app.state.services = services
+    return services
 
 
 # -------------------------------------------------------------------------
@@ -382,3 +402,267 @@ async def get_git_status() -> Dict[str, Any]:
             "uncommitted_files": [],
             "error": str(e),
         }
+
+
+# -------------------------------------------------------------------------
+# Phase 07 — Intelligence Module Endpoints
+# -------------------------------------------------------------------------
+
+@router.get(
+    "/api/v1/intelligence/modules",
+    tags=["Intelligence"],
+    summary="List all 12 specialized modular intelligence engines",
+)
+async def list_intelligence_modules() -> Dict[str, Any]:
+    """Returns metadata, status, and responsibilities for all Phase 07 intelligence modules."""
+    return {
+        "status": "active",
+        "phase": "Phase 07 — Intelligence Modules",
+        "total_modules": 12,
+        "modules": [
+            {"id": "logical", "name": "Logical Reasoning Engine", "package": "core.reasoning.logical", "status": "implemented"},
+            {"id": "mathematical", "name": "Mathematical Reasoning Engine", "package": "core.reasoning.mathematical", "status": "implemented"},
+            {"id": "scientific", "name": "Scientific Reasoning Engine", "package": "core.reasoning.scientific", "status": "implemented"},
+            {"id": "coding", "name": "Coding Intelligence Engine", "package": "personal_ai.coding_assistant.coding_engine", "status": "implemented"},
+            {"id": "cybersecurity", "name": "Cybersecurity Intelligence Engine", "package": "personal_ai.cybersecurity.cyber_engine", "status": "implemented"},
+            {"id": "critical_thinking", "name": "Critical Thinking Engine", "package": "core.reasoning.critical", "status": "implemented"},
+            {"id": "creative", "name": "Creative Problem-Solving Engine", "package": "core.reasoning.creative", "status": "implemented"},
+            {"id": "research", "name": "Research and Knowledge Analysis Engine", "package": "core.intelligence.research_engine", "status": "implemented"},
+            {"id": "planning", "name": "Planning and Decision-Making Engine", "package": "agent.planner.planning_engine", "status": "implemented"},
+            {"id": "self_evaluation", "name": "Self-Evaluation and Error Detection Engine", "package": "core.intelligence.self_evaluation", "status": "implemented"},
+            {"id": "language", "name": "Language and Communication Engine", "package": "core.intelligence.language_engine", "status": "implemented"},
+            {"id": "knowledge", "name": "General Knowledge Processing Engine", "package": "core.intelligence.knowledge_engine", "status": "implemented"},
+        ],
+        "router": "CentralIntelligenceRouter (core.intelligence.central_router)",
+        "security_policy": "Defensive operations only; sandbox barrier enforced for code execution; zero pretrained weights.",
+    }
+
+
+def _get_central_router(services: Dict[str, Any]) -> CentralIntelligenceRouter:
+    """Helper to retrieve or lazily create CentralIntelligenceRouter."""
+    if "central_router" in services and services["central_router"] is not None:
+        return services["central_router"]
+    router_inst = CentralIntelligenceRouter()
+    services["central_router"] = router_inst
+    return router_inst
+
+
+@router.post(
+    "/api/v1/intelligence/query",
+    response_model=IntelligenceQueryResponse,
+    tags=["Intelligence"],
+    summary="Route query through Central Intelligence Router",
+)
+async def route_intelligence_query(
+    req: IntelligenceQueryRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> IntelligenceQueryResponse:
+    """Routes query dynamically to target intelligence engines and reconciles outputs."""
+    c_router = _get_central_router(services)
+    hints = req.context_hints or {}
+    if req.force_engine:
+        hints["force_engine"] = req.force_engine
+
+    try:
+        res = c_router.dispatch(query=req.query, context_hints=hints)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    return IntelligenceQueryResponse(
+        query=res.query,
+        primary_engine=res.dispatch_plan.primary_engine,
+        secondary_engines=res.dispatch_plan.secondary_engines,
+        intent_confidence=res.dispatch_plan.intent_confidence,
+        combined_summary=res.combined_summary,
+        conflicts_detected=res.conflicts_detected,
+        is_fallback_used=res.is_fallback_used,
+    )
+
+
+@router.post(
+    "/api/v1/intelligence/logical",
+    response_model=LogicalReasoningResponse,
+    tags=["Intelligence"],
+    summary="Execute formal and deductive logical reasoning",
+)
+async def analyze_logical(
+    req: LogicalReasoningRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> LogicalReasoningResponse:
+    """Decomposes logical problem, detects contradictions, and quantifies epistemic uncertainty."""
+    c_router = _get_central_router(services)
+    try:
+        res = c_router.logical_engine.analyze(
+            problem=req.problem,
+            premises=req.premises,
+            candidates=req.candidates,
+            constraints=req.constraints,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    return LogicalReasoningResponse(
+        problem=res.problem,
+        decomposed_steps=res.decomposed_steps,
+        assumptions=res.assumptions,
+        premises_count=len(res.premises),
+        contradictions_count=len(res.contradictions),
+        conclusion=res.conclusion,
+        epistemic_uncertainty=res.epistemic_uncertainty,
+        summary=res.summary,
+    )
+
+
+@router.post(
+    "/api/v1/intelligence/math",
+    response_model=MathReasoningResponse,
+    tags=["Intelligence"],
+    summary="Deterministic mathematical computation and verification",
+)
+async def compute_math(
+    req: MathReasoningRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> MathReasoningResponse:
+    """Computes arithmetic, algebraic, or statistical problems with numerical verification."""
+    c_router = _get_central_router(services)
+    try:
+        res = c_router.mathematical_engine.evaluate_arithmetic(req.expression)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    return MathReasoningResponse(
+        domain=res.domain,
+        query_description=res.query_description,
+        exact_solution=res.exact_solution,
+        numerical_approximation=res.numerical_approximation,
+        is_verified=res.verification.is_verified if res.verification else True,
+        summary=res.summary,
+    )
+
+
+@router.post(
+    "/api/v1/intelligence/coding",
+    response_model=CodingAnalysisResponse,
+    tags=["Intelligence"],
+    summary="Defensive code inspection and complexity estimation",
+)
+async def analyze_code(
+    req: CodingAnalysisRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> CodingAnalysisResponse:
+    """Parses code AST, detects bugs and complexity, enforcing sandbox execution prohibition."""
+    c_router = _get_central_router(services)
+    try:
+        res = c_router.coding_engine.analyze(req.code, language_hint=req.language)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    return CodingAnalysisResponse(
+        language=res.language,
+        is_valid_syntax=res.is_valid_syntax,
+        functions=res.functions,
+        classes=res.classes,
+        estimated_time_complexity=res.complexity.estimated_time_complexity,
+        estimated_space_complexity=res.complexity.estimated_space_complexity,
+        issues_count=len(res.issues),
+        sandbox_execution_permitted=res.sandbox_notice.execution_permitted,
+        sandbox_warning=res.sandbox_notice.warning,
+        explanation=res.explanation,
+    )
+
+
+@router.post(
+    "/api/v1/intelligence/security",
+    response_model=SecurityAuditResponse,
+    tags=["Intelligence"],
+    summary="Defensive cybersecurity triage and pattern inspection",
+)
+async def audit_security(
+    req: SecurityAuditRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> SecurityAuditResponse:
+    """Defensive log inspection, artifact scanning, and hardening recommendations."""
+    c_router = _get_central_router(services)
+    file_sample = (req.filename, req.file_content) if (req.filename and req.file_content) else None
+    try:
+        res = c_router.cybersecurity_engine.audit(
+            query=req.query,
+            logs=req.logs,
+            file_sample=file_sample,
+        )
+    except PermissionError as pe:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(pe))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    cats = list({t.category for t in res.threats_identified})
+    risk = res.log_report.overall_risk_level if res.log_report else "LOW"
+
+    return SecurityAuditResponse(
+        target_type=res.target_type,
+        threats_detected_count=len(res.threats_identified),
+        threat_categories=cats,
+        overall_risk_level=risk,
+        hardening_recommendations=res.hardening_recommendations,
+        is_defensive_compliant=res.is_defensive_compliant,
+        defensive_policy_notice=res.notice,
+    )
+
+
+@router.post(
+    "/api/v1/intelligence/plan",
+    response_model=PlanningResponse,
+    tags=["Intelligence"],
+    summary="Goal decomposition into topologically sorted DAG with risk gating",
+)
+async def create_execution_plan(
+    req: PlanningRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> PlanningResponse:
+    """Sequences subtasks into dependency graph and checks mandatory human approval gates."""
+    c_router = _get_central_router(services)
+    try:
+        plan = c_router.planning_engine.create_plan(req.objective, subtasks_data=req.subtasks)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    return PlanningResponse(
+        objective=plan.objective,
+        total_tasks=len(plan.tasks),
+        task_order=plan.task_order,
+        requires_human_approval=plan.requires_human_approval,
+        pending_approvals_count=plan.pending_approvals_count,
+        summary=plan.summary,
+    )
+
+
+@router.post(
+    "/api/v1/intelligence/self_evaluate",
+    response_model=SelfEvaluationResponse,
+    tags=["Intelligence"],
+    summary="Self-evaluation, consistency verification, and modesty check",
+)
+async def self_evaluate_output(
+    req: SelfEvaluationRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> SelfEvaluationResponse:
+    """Audits generated response against query and factual constraints."""
+    c_router = _get_central_router(services)
+    try:
+        eval_res = c_router.self_eval_engine.evaluate(
+            query=req.query,
+            output=req.candidate_output,
+            context_facts=req.context_facts,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    return SelfEvaluationResponse(
+        is_valid=eval_res.is_valid,
+        quality_score=eval_res.quality_score,
+        epistemic_modesty_status=eval_res.epistemic_modesty_status,
+        findings_count=len(eval_res.findings),
+        contains_contradictions=eval_res.contains_contradictions,
+        missing_elements=eval_res.missing_elements,
+        summary=eval_res.summary,
+    )
