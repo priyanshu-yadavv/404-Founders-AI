@@ -1,0 +1,44 @@
+# 404 FOUNDERS — Security Policy & Governance Specification
+version: "1.0"
+policy_name: "404_founders_strict_least_privilege"
+
+permission_tiers:
+  read_only:
+    level: 1
+    description: "Safe inspection queries, hardware telemetry, and public log analysis"
+    requires_confirmation: false
+    allowed_operations:
+      - "system_telemetry"
+      - "file_read"
+      - "git_status"
+      - "network_query"
+
+  protected:
+    level: 2
+    description: "Non-destructive workspace modifications, code formatting, file creation"
+    requires_confirmation: true
+    allowed_operations:
+      - "file_write_workspace"
+      - "git_add_commit"
+      - "build_command"
+
+  privileged:
+    level: 3
+    description: "System service orchestration, remote network calls, process spawning"
+    requires_confirmation: true
+    allowed_operations:
+      - "service_start_stop"
+      - "api_egress_call"
+      - "package_install_local_venv"
+
+  dangerous:
+    level: 4
+    description: "Destructive operations, root access, filesystem partitioning"
+    requires_confirmation: true
+    allowed_operations: [] # Prohibited from autonomous agent execution
+
+audit:
+  enabled: true
+  target: "logs/security_audit.log"
+  log_parameters: true
+  log_timestamp_format: "ISO8601"
