@@ -105,7 +105,11 @@ lerna-debug.log*
 *.safetensors
 *.h5
 *.tflite
+*.sha256
 models/checkpoints/
+checkpoints/
+training_runs/
+experiments/
 
 # Dataset storage & raw data artifacts (never commit raw datasets)
 data/raw/

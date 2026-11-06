@@ -3,7 +3,7 @@
 Integrates RMSNorm, Multi-Mechanism Attention, and Gated SwiGLU / Expert Feedforward.
 """
 
-from typing import Dict, Optional, Tuple
+from typing import Callable, Dict, Optional, Tuple
 import torch
 import torch.nn as nn
 
@@ -38,7 +38,7 @@ class HierarchicalTransformerBlock(nn.Module):
         self.d_model = d_model
         self.use_fusion_attention = use_fusion_attention
 
-        # 1. Attention sublayer
+        # 1. Attention sublayer with pre-norm and LayerScale residual
         if use_fusion_attention:
             self.attention = AttentionFusionController(
                 d_model=d_model,
@@ -54,13 +54,19 @@ class HierarchicalTransformerBlock(nn.Module):
                 dropout=dropout,
             )
 
-        self.attn_norm = CustomRMSNorm(d_model)
         self.attn_residual = ResidualConnection(d_model, use_layer_scale=True, dropout=dropout)
 
-        # 2. Feedforward sublayer
+        # 2. Feedforward sublayer with pre-norm and LayerScale residual
         self.ffn = FeatureTransformationLayer(d_model=d_model, intermediate_dim=intermediate_dim, dropout=dropout)
-        self.ffn_norm = CustomRMSNorm(d_model)
         self.ffn_residual = ResidualConnection(d_model, use_layer_scale=True, dropout=dropout)
+
+    @property
+    def attn_norm(self) -> CustomRMSNorm:
+        return self.attn_residual.norm
+
+    @property
+    def ffn_norm(self) -> CustomRMSNorm:
+        return self.ffn_residual.norm
 
     def forward(
         self,
@@ -75,12 +81,14 @@ class HierarchicalTransformerBlock(nn.Module):
         Returns:
             Tuple of (output tensor, attention weights or gate telemetry)
         """
-        # Attention sublayer with pre-norm
-        attn_out, attn_meta = self.attention(self.attn_norm(x), attention_mask=attention_mask)
-        x = x + attn_out
+        attn_meta = None
 
-        # Feedforward sublayer with pre-norm
-        ffn_out = self.ffn(self.ffn_norm(x))
-        x = x + ffn_out
+        def _attn_sublayer(normed_x: torch.Tensor) -> torch.Tensor:
+            nonlocal attn_meta
+            out, attn_meta = self.attention(normed_x, attention_mask=attention_mask)
+            return out
+
+        x = self.attn_residual(x, _attn_sublayer)
+        x = self.ffn_residual(x, self.ffn)
 
         return x, attn_meta

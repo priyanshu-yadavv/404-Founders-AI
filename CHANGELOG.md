@@ -5,6 +5,61 @@ All notable changes to the 404 FOUNDERS project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to Phase-based Development Governance.
 
+## [Phase-06] - 2026-11-06
+
+### Added
+- **Foundation Model Pretraining Configuration (`training/configs/`):**
+  - `FoundationModelConfig` & `PretrainingConfig`: Type-safe architectural specifications decoupled from pretraining hyperparameters.
+  - Four standard profiles: `EXPERIMENTAL_TINY_CONFIG` (~221k params), `EXPERIMENTAL_LOCAL_CPU_CONFIG` (~633k params), `RESEARCH_PILOT_CONFIG` (~25.4M params), and `PRODUCTION_CLUSTER_SPEC` (~1.21B params).
+- **Random Initialization & Parameter Auditing (`training/initialization/`):**
+  - `ModelInitializer`: Pure statistical weight initialization applying fan-in scaled Gaussians ($\mathcal{N}(0, 1/d_{\text{in}})$), $\frac{1}{\sqrt{2 N_{\text{layers}}}}$ down-scaling for residual projections, constant $1.0$ for RMSNorm/LayerScale gains, and $0.0$ for biases. Strictly zero pretrained checkpoints loaded.
+  - Non-finite check (`torch.all(torch.isfinite(p))`) rejecting NaN or Inf parameters.
+  - SHA-256 weight fingerprinting across all raw tensor byte streams.
+  - `InitializationReport`: Comprehensive parameter statistics and zero-pretrained guarantee assertion.
+- **Autoregressive Loss Engine (`training/objectives/`):**
+  - `AutoregressiveLossEngine`: Shifted cross-entropy loss $\mathcal{L}_{\text{AR}}(\theta) = -\frac{1}{N} \sum \log P(x_{t+1} \mid x_{1:t})$ with `<pad>` (ignore_index=0) suppression, token accuracy calculation, and perplexity tracking.
+- **Decoupled Optimization & Schedulers (`training/optimizers/`, `training/schedulers/`):**
+  - `OptimizationEngine`: AdamW with parameter decay grouping (2D weights decayed by $\lambda=0.01$; 1D biases and normalization gains $\lambda=0.0$), gradient norm clipping ($g_{\max}=1.0$), and gradient accumulation.
+  - `CosineWarmupScheduler`: Linear warmup across $t \le t_{\text{warmup}}$ followed by cosine annealing decay down to $\eta_{\min}$.
+- **Data Loaders & Synthetic Generators (`training/dataloaders/`):**
+  - `TokenizedSequenceDataset`: Sequence padding, truncation, and attention mask construction.
+  - `SyntheticDatasetGenerator`: Periodic n-gram patterns and counting sequences for deterministic smoke verification.
+  - `FoundationDataLoader`: Reproducible seeded shuffling and batch collation.
+- **Forward & Device Execution Engines (`training/engine/`):**
+  - `DeviceManager`: Safe execution device resolution (CPU, CUDA, MPS) with mixed-precision autocast contexts.
+  - `ForwardEngine`: Causal upper-triangular boolean attention mask construction.
+  - `TrainingOrchestrator`: Pretraining lifecycle coordinator with OS signal handling (`SIGINT`, `SIGTERM`) for emergency checkpointing.
+  - `ComputeReadinessGate`: Analytical peak memory breakdown ($M_{\text{weights}} + M_{\text{grads}} + M_{\text{opt}} + M_{\text{act}}$) enforcing safe workstation memory ceilings on swapless hosts.
+- **Distributed Training Interface (`training/distributed/`):**
+  - `DistributedEngine`: Rank determination, collective synchronization, and standalone workstation fallback.
+- **Secure Checkpoint Management (`training/checkpoints/`):**
+  - `CheckpointManager`: Atomic two-phase writes (`.tmp` -> `.pt`) with SHA-256 sidecars (`.pt.sha256`), tamper detection (`CheckpointCorruptedError`), rolling retention, and full state restoration.
+- **Monitoring & Experiment Tracking (`training/monitoring/`, `training/experiments/`):**
+  - `TrainingMonitor`: Step throughput (tokens/sec), loss, perplexity, and RAM usage logged to machine-readable JSONL.
+  - `ExperimentTracker` & `ExperimentManifest`: Reproducible experiment hyperparameter and outcome persistence.
+- **10-Step Pre-Flight Verification Suite (`training/validation/`):**
+  - `PreflightVerifier`: Automated 10-step protocol covering initialization, forward pass, loss calculation, backward pass, gradient flow across all pathways, optimizer parameter updates, checkpoint saving, recovery, validation loop, and toy overfitting (>20% loss reduction).
+  - `ValidationEngine`: Held-out evaluation in zero-grad mode with overfitting detection.
+- **Developer CLI Tooling (`scripts/`):**
+  - `scripts/initialize_model.py`: Model initialization from random weights and layer auditing.
+  - `scripts/validate_training.py`: Mandatory 10-step preflight verification suite.
+  - `scripts/run_training.py`: Controlled local pilot pretraining with telemetry.
+  - `scripts/inspect_checkpoint.py`: Checkpoint inspection and cryptographic validation.
+  - `scripts/resume_training.py`: Checkpoint resumption test.
+- **8 Technical Architecture Manuals in `docs/`:**
+  - [`docs/FOUNDATION_PRETRAINING.md`](docs/FOUNDATION_PRETRAINING.md) (`DOC-TRAIN-001`)
+  - [`docs/MODEL_INITIALIZATION.md`](docs/MODEL_INITIALIZATION.md) (`DOC-INIT-001`)
+  - [`docs/TRAINING_OBJECTIVES.md`](docs/TRAINING_OBJECTIVES.md) (`DOC-TRAIN-002`)
+  - [`docs/TRAINING_PIPELINE.md`](docs/TRAINING_PIPELINE.md) (`DOC-TRAIN-003`)
+  - [`docs/CHECKPOINT_MANAGEMENT.md`](docs/CHECKPOINT_MANAGEMENT.md) (`DOC-TRAIN-004`)
+  - [`docs/TRAINING_MONITORING.md`](docs/TRAINING_MONITORING.md) (`DOC-TRAIN-005`)
+  - [`docs/COMPUTE_READINESS.md`](docs/COMPUTE_READINESS.md) (`DOC-TRAIN-006`)
+  - [`docs/TRAINING_EXPERIMENTS.md`](docs/TRAINING_EXPERIMENTS.md) (`DOC-TRAIN-007`)
+- **Automated Test Suite (21 New Tests in `tests/training/`):**
+  - Total test count expanded to 125 tests (100% passing on CPU).
+
+---
+
 ## [Phase-05] - 2026-11-06
 
 ### Added

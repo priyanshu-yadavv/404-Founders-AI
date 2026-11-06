@@ -1,0 +1,14 @@
+{
+  "name": "404-founders-frontend",
+  "version": "0.5.0",
+  "description": "404 FOUNDERS Localhost Web Dashboard & Testing Interface",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js",
+    "check": "node --check server.js"
+  },
+  "type": "commonjs",
+  "author": "404 FOUNDERS",
+  "license": "Apache-2.0"
+}

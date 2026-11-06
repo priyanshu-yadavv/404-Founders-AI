@@ -302,44 +302,89 @@ Complete architectural specifications are maintained in [`docs/`](docs/):
 | **Phase 02** | Project Architecture & Workspace Design | **Completed** |
 | **Phase 03** | Core AI Foundation Development | **Completed** |
 | **Phase 04** | Custom BPE Tokenizer & Data Pipeline | **Completed** |
-| **Phase 05** | **Training Infrastructure & GPU Cluster Architecture** | **Completed (Review Pending)** |
-| Phase 06 | Foundation Model Pretraining & Optimization | Planned |
+| **Phase 05** | Training Infrastructure & GPU Cluster Architecture | **Completed** |
+| **Phase 06** | **Foundation Model Pretraining from Random Initialization** | **Completed (Review Pending)** |
 | Phase 07 | Personal AI Assistant & OS Intelligence | Planned |
 | Phase 08 | Tri-Protocol API Services & Production Release | Planned |
 
 ---
 
-## 9. Quickstart & Verification
+## 9. Quickstart, Localhost Testing & Verification
+
+### Localhost Application Execution
+
+The project can be run locally on the developer workstation without GPUs or pretrained weights.
+
+#### Step 1: Launch Backend API Server (FastAPI + Uvicorn)
+```bash
+# Start FastAPI backend on http://127.0.0.1:8000
+.venv/bin/python scripts/run_backend.py
+
+# Or via uvicorn directly:
+.venv/bin/uvicorn api.rest.app:app --host 127.0.0.1 --port 8000
+```
+- **Health Check:** [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health)
+- **Interactive OpenAPI Documentation:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+- **ReDoc API Documentation:** [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
+
+#### Step 2: Launch Frontend Testing Dashboard
+```bash
+# In a separate terminal, start frontend on http://localhost:5173
+cd frontend && npm start
+
+# Or directly:
+node frontend/server.js
+```
+- **Local Dashboard:** [http://localhost:5173](http://localhost:5173)
+
+---
+
+### Automated Tests & CLI Diagnostics
 
 ```bash
-# 1. Run complete automated test suite (98 tests) on CPU
+# 1. Run complete automated test suite (125 tests) on CPU
 .venv/bin/python -m pytest tests/
 
-# 2. Perform safe host hardware audit & runtime budgeting check
+# 2. Execute 10-step Pre-Flight Training Verification Suite
+.venv/bin/python scripts/validate_training.py
+
+# 3. Model initialization from random weights & parameter auditing
+.venv/bin/python scripts/initialize_model.py --profile local_cpu --seed 404
+
+# 4. Run controlled local pilot pretraining with telemetry
+.venv/bin/python scripts/run_training.py --profile tiny --steps 15
+
+# 5. Inspect saved checkpoint metadata & verify SHA-256 integrity sidecar
+.venv/bin/python scripts/inspect_checkpoint.py training_runs/<run_id>/checkpoints/best_model.pt
+
+# 6. Resume pretraining from a verified checkpoint
+.venv/bin/python scripts/resume_training.py training_runs/<run_id>/checkpoints/checkpoint_step_0000015_final.pt --additional-steps 10
+
+# 7. Perform safe host hardware audit & runtime budgeting check
 .venv/bin/python scripts/system_check.py
 
-# 3. Perform GPU & CUDA compatibility inspection (reports local host & cluster tiers)
+# 8. Perform GPU & CUDA compatibility inspection (reports local host & cluster tiers)
 .venv/bin/python scripts/gpu_check.py
 
-# 4. Audit software environment, compiler toolchain, and libraries
+# 9. Audit software environment, compiler toolchain, and libraries
 .venv/bin/python scripts/environment_check.py
 
-# 5. Run storage tiering capacity and local sequential I/O benchmark
+# 10. Run storage tiering capacity and local sequential I/O benchmark
 .venv/bin/python scripts/storage_check.py
 
-# 6. Train a Custom BPE Tokenizer model on sample text
+# 11. Train a Custom BPE Tokenizer model on sample text
 .venv/bin/python scripts/train_tokenizer.py \
     --input README.md \
     --output configs/tokenizer/tokenizer_model.json \
     --vocab-size 512
 
-# 7. Encode text with BOS/EOS tags
+# 12. Encode text with BOS/EOS tags
 .venv/bin/python scripts/encode_text.py \
     --model configs/tokenizer/tokenizer_model.json \
     --text "नमस्ते भारत! 404 FOUNDERS is an enterprise AI assistant." \
     --add-bos --add-eos
 
-# 8. Execute prototype inference with greedy token prediction
+# 13. Execute prototype inference with greedy token prediction
 .venv/bin/python -c "
 from neural_architecture.inference import InferenceEngine
 engine = InferenceEngine()

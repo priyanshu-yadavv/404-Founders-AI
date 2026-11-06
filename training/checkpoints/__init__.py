@@ -1,4 +1,13 @@
 """
-404 FOUNDERS — Training/Checkpoints
-Atomic model checkpoint saving, resume logic, optimizer state persistence.
+404 FOUNDERS — Checkpoints Package
 """
+
+from training.checkpoints.checkpoint_manager import (
+    CheckpointCorruptedError,
+    CheckpointManager,
+)
+
+__all__ = [
+    "CheckpointManager",
+    "CheckpointCorruptedError",
+]
