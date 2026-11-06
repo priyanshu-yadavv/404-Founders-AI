@@ -214,3 +214,101 @@ Authored 6 comprehensive technical specifications in `docs/`:
   - All 44 Phase 02 and Phase 03 tests passing.
 - **Results: 73 passed in 1.74s (100% success rate on CPU).**
 - Staged all Phase 04 changes awaiting user review.
+
+
+---
+
+## [2026-11-06T21:35:00+05:30] — Phase 05: Training Infrastructure & GPU Cluster Architecture
+
+### 1. Architectural Alignment & Constraints
+- **Role**: Chief AI Infrastructure Architect, Distributed Systems Engineer and GPU Computing Engineer.
+- **Physical Environment Acknowledged**: Dell Latitude 5400 workstation (Kali Linux Rolling, Intel Core i5-8365U 4C/8T, 15.4 GB RAM, 0B swap, Intel UHD Graphics 620 UMA, 0 dedicated VRAM, no NVIDIA/CUDA).
+- **Core Directive**: Strict architectural separation between the resource-constrained local developer workstation and dedicated cloud/on-premise accelerator clusters. No pretrained foundation model weights permitted.
+
+### 2. Local Hardware & Workstation Runtime Management
+- **Hardware Telemetry (`infrastructure/local/hardware.py`):**
+  - Implemented `LocalHardwareInspector` with safe, read-only system introspection reading `/proc/cpuinfo`, `/proc/meminfo`, `shutil.disk_usage`, `/dev/kvm`, and `nvidia-smi` without requiring root or modifying kernel parameters.
+  - Generates typed `LocalHardwareProfile` detailing physical cores, logical threads, AVX, AVX2, FMA3, AVX-512 vector support, RAM bytes, and swap statistics.
+- **Runtime Budgeting (`infrastructure/local/runtime.py`):**
+  - Implemented `LocalRuntimeManager` with dynamic memory budgeting.
+  - Enforces a conservative 60% available RAM ceiling (~0.88–3.1 GB depending on host load) specifically designed to prevent Linux kernel OOM panics on swapless systems.
+  - Caps CPU compute worker threads to physical core count (4 threads) to prevent hyperthread thread thrashing on OpenMP, MKL, and PyTorch CPU kernels.
+
+### 3. Cloud Provider Profiles & Hybrid Workload Routing
+- **Cloud Instance Registry (`infrastructure/cloud/provider_specs.py`):**
+  - Modeled reference hourly market rates across Lambda Labs, RunPod, CoreWeave, and AWS as of Q4 2026.
+  - Tracks accelerator types (RTX 4090, L40S, H100 SXM5, H200 SXM5), intra-node buses (PCIe 4.0, NVLink 4), and inter-node fabrics (InfiniBand NDR 400G, AWS EFAv2).
+- **Hybrid Workload Router (`infrastructure/cloud/hybrid_router.py`):**
+  - Implemented `HybridWorkloadRouter` analyzing parameter counts, token budgets, and memory demands.
+  - Routes compute tasks:
+    - `<= 50M` parameters: `local_workstation_cpu` ($0.00/hr)
+    - `50M` to `1.5B` parameters: `cloud_tier_a_dev_node` (~$0.50–$1.50/hr)
+    - `1.5B` to `14B` parameters: `cloud_tier_b_research_node` (~$23.92/hr)
+    - `> 14B` parameters / massive pretraining: `cloud_tier_c_gpu_supercluster` (~$191.36/hr).
+
+### 4. GPU Cluster Architecture & Interconnect Modeling
+- **Cluster Specifications (`infrastructure/gpu_cluster/cluster_config.py`):**
+  - Formal dataclass definitions for `TIER_A_DEV` (1 Node, 2x RTX 4090 / L40S PCIe 4.0), `TIER_B_RESEARCH` (1 Node, 8x H100 80GB SXM5 NVLink 4 7.2 TB/s mesh), and `TIER_C_FOUNDATION` (8 Nodes, 64x H100/H200 SXM5, 5,120 GB cluster VRAM, 3.2 Tbps InfiniBand NDR per node).
+- **Interconnect Modeling (`infrastructure/gpu_cluster/interconnect.py`):**
+  - Implemented `InterconnectModel` computing exact Ring AllReduce transfer durations using standard distributed collective equations ($T = 2 \frac{N-1}{N} \frac{S}{B} + L$).
+- **Rail-Optimized Fabric (`infrastructure/gpu_cluster/topology.py`):**
+  - Implemented `RailOptimizedFabric` mapping GPU index $k$ to dedicated rail switch $k$, eliminating cross-rail network congestion across 8 parallel InfiniBand NDR rails.
+
+### 5. Distributed Training, 4D Parallelism & Checkpointing
+- **4D Parallelism Grid (`infrastructure/distributed/parallelism.py`):**
+  - Implemented `ParallelismConfig` enforcing $DP \times TP \times PP \times SP == \text{Total GPUs}$.
+  - `ParallelismEngine` suggests validated distributed grids for Tier A, Tier B, and Tier C clusters.
+- **Gradient Synchronization (`infrastructure/distributed/gradient_sync.py`):**
+  - Implemented `GradientSyncManager` configuring optimal gradient bucket sizes (25 MB for single node, 50 MB for multi-node) and communication-computation overlap.
+- **Atomic Sharded Checkpointing (`infrastructure/distributed/checkpointing.py`):**
+  - Implemented `DistributedCheckpointManager` performing atomic writes via staging directories (`.staging_step_XXXXX/`) and atomic renames.
+  - Generates `checkpoint_manifest.json` with per-shard SHA-256 hashes, step, loss, and token counters.
+  - Enforces rolling retention preserving milestone checkpoints indefinitely while pruning older intermediate snapshots.
+
+### 6. Storage Tiering & Checkpoint Vault
+- **Storage Lifecycle (`infrastructure/storage/storage_tiering.py`):**
+  - Implemented `StorageTierManager` managing Hot (NVMe scratch), Warm (Parallel Filesystem Lustre/WEKA), and Cold (Object Storage S3/Ceph) tiers with LRU cache eviction and capacity quotas.
+- **Checkpoint Vault (`infrastructure/storage/checkpoint_vault.py`):**
+  - Implemented `CheckpointVault` providing versioned cataloging, immutable read-only permissions (`0444`), and safe recovery mechanisms.
+
+### 7. Containerization, Monitoring & Cluster Security
+- **Containerization (`infrastructure/containers/`):**
+  - Generated production Dockerfiles and docker-compose configurations (`docker_specs.py`) with CUDA 12.4, cuDNN 9.1, PyTorch 2.4, JAX 0.4.30, and FlashAttention-2.
+  - Generated Slurm SBATCH job submission templates (`slurm_specs.py`) with Pyxis/Enroot and torchrun integration.
+- **Monitoring & Telemetry (`infrastructure/monitoring/`):**
+  - Implemented `MetricsCollector` calculating step duration, tokens/second, achieved TFLOPS, and Model FLOPs Utilization (MFU %).
+  - Implemented `ExperimentTracker` offering offline air-gapped JSONL logging and optional TensorBoard integration.
+- **Cluster Security (`infrastructure/security/`):**
+  - Implemented `ClusterSecurityManager` enforcing RBAC across `cluster_admin`, `ml_engineer`, `researcher`, and `auditor_observer`.
+  - Zero-trust SSH validation approving Ed25519 and rejecting legacy RSA keys.
+  - Automated regex credential masking for HuggingFace, GitHub, OpenAI, and AWS tokens.
+  - Immutable audit logging to `logs/security_audit.jsonl`.
+
+### 8. CLI Diagnostic Tooling
+- Implemented executable scripts in `scripts/`:
+  - `scripts/system_check.py`: Safe host hardware inspection and runtime budgeting.
+  - `scripts/gpu_check.py`: GPU and CUDA compatibility audit (gracefully handling CPU host and reporting cluster targets).
+  - `scripts/environment_check.py`: Toolchain audit (Python, PyTorch, JAX, GCC, Git, Docker).
+  - `scripts/storage_check.py`: Storage tiering and local sequential I/O benchmark.
+
+### 9. Documentation Authored
+Authored 8 comprehensive technical manuals in `docs/`:
+- [`docs/GPU_CLUSTER_ARCHITECTURE.md`](docs/GPU_CLUSTER_ARCHITECTURE.md) (`DOC-INFRA-001`)
+- [`docs/DISTRIBUTED_TRAINING.md`](docs/DISTRIBUTED_TRAINING.md) (`DOC-INFRA-002`)
+- [`docs/PYTORCH_JAX_INFRASTRUCTURE.md`](docs/PYTORCH_JAX_INFRASTRUCTURE.md) (`DOC-INFRA-003`)
+- [`docs/CUDA_COMPATIBILITY.md`](docs/CUDA_COMPATIBILITY.md) (`DOC-INFRA-004`)
+- [`docs/STORAGE_ARCHITECTURE.md`](docs/STORAGE_ARCHITECTURE.md) (`DOC-INFRA-005`)
+- [`docs/INFRASTRUCTURE_SECURITY.md`](docs/INFRASTRUCTURE_SECURITY.md) (`DOC-INFRA-006`)
+- [`docs/TRAINING_COMPUTE_ESTIMATION.md`](docs/TRAINING_COMPUTE_ESTIMATION.md) (`DOC-INFRA-007`)
+- [`docs/INFRASTRUCTURE_COST_ANALYSIS.md`](docs/INFRASTRUCTURE_COST_ANALYSIS.md) (`DOC-INFRA-008`)
+
+### 10. Automated Testing & Verification
+- Authored 25 new tests in `tests/`:
+  - `tests/infrastructure/test_local_hardware.py` (3 tests)
+  - `tests/infrastructure/test_cluster_architecture.py` (5 tests)
+  - `tests/infrastructure/test_distributed_training.py` (5 tests)
+  - `tests/infrastructure/test_storage_vault.py` (4 tests)
+  - `tests/infrastructure/test_cluster_security.py` (4 tests)
+  - `tests/configuration/test_infrastructure_configs.py` (4 tests)
+- Executed full test suite: **98 passed in 1.88s (100% success rate on CPU)**.
+- Staged all Phase 05 files awaiting user review.

@@ -1,0 +1,52 @@
+# 404 FOUNDERS — Cluster Tier C (Foundation Model Pretraining Supercluster) Configuration
+tier: "Tier C — Foundation Supercluster"
+target_environment: "multi_node_gpu_supercluster"
+nodes:
+  node_count: 8
+  gpus_per_node: 8
+  total_gpus: 64
+
+accelerators:
+  gpu_model: "NVIDIA H100 80GB SXM5 / NVIDIA H200 141GB SXM5"
+  gpu_count: 64
+  vram_per_gpu_gb: 80
+  total_cluster_vram_gb: 5120
+  fp8_support: true
+  bfloat16_peak_tflops_cluster: 63296.0
+
+host_per_node:
+  cpu_model: "Dual AMD EPYC 9654 96-Core Processors (192 cores / 384 threads per node)"
+  cpu_cores: 192
+  system_ram_gb: 2048
+  total_cluster_ram_gb: 16384
+  os: "Ubuntu 22.04 LTS (Kernel 5.15 / 6.5) with NVIDIA GPU Operator and Slurm Workload Manager"
+
+interconnect:
+  intra_node: "NVIDIA NVLink 4 + NVSwitch (900 GB/s per GPU, 7.2 TB/s aggregate per node)"
+  inter_node: "NVIDIA Quantum-2 InfiniBand NDR 400 Gbps (8x OSFP HCAs per node = 3.2 Tbps per node)"
+  fabric_topology: "Rail-optimized 2-tier Fat-Tree, non-blocking 1:1 bisection bandwidth"
+
+storage:
+  hot_nvme_scratch_tb: 120.0     # 15 TB per node local NVMe direct-attached scratch
+  warm_parallel_fs_tb: 500.0     # Lustre / WEKA parallel filesystem (100+ GB/s throughput)
+  cold_object_storage_tb: 2000.0 # Multi-PB S3/Ceph object archive for raw datasets and milestones
+
+parallelism_defaults:
+  data_parallel_size: 8
+  tensor_parallel_size: 4
+  pipeline_parallel_size: 2
+  sequence_parallel_size: 1
+  fsdp_sharding_strategy: "FULL_SHARD"
+  mixed_precision: "bfloat16"
+  gradient_accumulation_steps: 4
+
+slurm:
+  partition: "h100_pretraining"
+  qos: "pretrain_high_priority"
+  checkpoint_interval_steps: 1000
+  heartbeat_timeout_seconds: 120
+
+purpose:
+  - "Foundation model pretraining from random initialization"
+  - "Multi-billion parameter multimodal training runs"
+  - "High-throughput token consumption across multi-trillion token datasets"

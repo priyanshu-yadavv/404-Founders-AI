@@ -1,0 +1,32 @@
+# 404 FOUNDERS — PyTorch Fully Sharded Data Parallel (FSDP) Configuration
+fsdp:
+  sharding_strategy: "FULL_SHARD" # FULL_SHARD (ZeRO-3), SHARD_GRAD_OP (ZeRO-2), NO_SHARD (DDP)
+  backward_prefetch: "BACKWARD_PRE" # Prefetch next layer's all-gather during backward compute
+  forward_prefetch: true
+  limit_all_gathers: true # Throttles inflight all-gathers to conserve memory
+  sync_module_states: true # Synchronize module weights from rank 0 at startup
+
+mixed_precision:
+  param_dtype: "bfloat16"
+  reduce_dtype: "bfloat16"
+  buffer_dtype: "bfloat16"
+  keep_low_precision_grads: false
+
+activation_checkpointing:
+  enabled: true
+  mode: "selective" # selective (attention layers only) or full (every transformer layer)
+  checkpoint_interval: 1
+
+cpu_offload:
+  offload_params: false # Disabled on Tier C H100 (kept in VRAM), optional for Tier A/B
+
+auto_wrap_policy:
+  module_names:
+    - "NeuralLayer"
+    - "HierarchicalAttention"
+    - "SwiGLUTransformation"
+  min_num_params: 10000000 # 10M minimum parameters per auto-wrapped unit
+
+state_dict_config:
+  state_dict_type: "SHARDED_STATE_DICT" # Decentralized rank-sharded checkpointing
+  offload_to_cpu: false

@@ -5,6 +5,78 @@ All notable changes to the 404 FOUNDERS project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to Phase-based Development Governance.
 
+## [Phase-05] - 2026-11-06
+
+### Added
+- **Local Workstation Hardware & Runtime Management (`infrastructure/local/`):**
+  - `LocalHardwareInspector`: Safe read-only host introspection of CPU (cores, threads, AVX, AVX2, FMA3, AVX-512), RAM, swap, storage, virtualization (`/dev/kvm`), and GPU.
+  - `LocalRuntimeManager`: Budgets system resources, enforcing 60% available RAM ceiling on swapless hosts and CPU worker limits to prevent Linux kernel OOM panics.
+- **Cloud Provider Specifications & Hybrid Workload Routing (`infrastructure/cloud/`):**
+  - `CloudProfileRegistry`: Reference market pricing across Lambda Labs, RunPod, CoreWeave, and AWS for Q4 2026.
+  - `HybridWorkloadRouter`: Automates execution placement across local workstation CPU, cloud single-node Tier A dev, Tier B research, and Tier C supercluster.
+- **GPU Cluster Architecture Specifications (`infrastructure/gpu_cluster/`):**
+  - Complete typed definitions for `TIER_A_DEV` (1-2x RTX 4090/L40S PCIe 4.0), `TIER_B_RESEARCH` (1 Node 8x H100 80GB SXM5 NVLink 4), and `TIER_C_FOUNDATION` (8 Nodes 64x H100/H200 SXM5 3.2 Tbps InfiniBand NDR).
+  - `InterconnectModel`: Ring AllReduce collective communication latency and transfer duration models.
+  - `RailOptimizedFabric`: Models 8-way rail-optimized InfiniBand fabrics and NVSwitch meshes with dedicated rail switches per GPU index.
+- **Distributed Training Infrastructure (`infrastructure/distributed/`):**
+  - `ParallelismConfig` & `ParallelismEngine`: 4D parallelism distribution validation ($DP \times TP \times PP \times SP == \text{Total GPUs}$) and cluster-specific topology recommendations.
+  - `GradientSyncPolicy` & `GradientSyncManager`: Gradient bucketing, accumulation steps, and communication-computation overlap.
+  - `DistributedCheckpointManager`: Atomic non-blocking persistence (staging directory + rename), SHA-256 integrity verification per shard, `checkpoint_manifest.json`, and rolling retention preserving milestones.
+- **Storage Tiering & Checkpoint Vault (`infrastructure/storage/`):**
+  - `StorageTierManager`: Hierarchical Hot (NVMe scratch), Warm (Lustre/WEKA parallel fs), and Cold (S3 object storage) lifecycle management with LRU cache eviction and capacity quotas.
+  - `CheckpointVault`: Versioned checkpoint cataloging with SHA-256 integrity verification and immutability locking for milestone releases.
+- **Containers & Slurm Orchestration (`infrastructure/containers/`):**
+  - `ContainerSpecGenerator`: Generates production CUDA 12.4 + PyTorch + JAX Dockerfiles and docker-compose configurations.
+  - `SlurmSpecGenerator`: Multi-node Slurm SBATCH job submission generator with Pyxis/Enroot and torchrun integration.
+- **Telemetry & Experiment Tracking (`infrastructure/monitoring/`):**
+  - `MetricsCollector`: System telemetry, load averages, memory utilization, step throughput (tokens/sec, achieved TFLOPS, MFU %).
+  - `ExperimentTracker`: Offline air-gapped JSONL logging, hyperparameter tracking, and TensorBoard integration.
+- **Cluster Security & Zero-Trust Governance (`infrastructure/security/`):**
+  - `ClusterSecurityManager`: RBAC authorization across `cluster_admin`, `ml_engineer`, `researcher`, `auditor_observer`.
+  - Zero-trust SSH validation enforcing Ed25519 and rejecting legacy RSA keys.
+  - Automated regex credential masking for HuggingFace, GitHub, OpenAI, and AWS tokens.
+  - Immutable audit logging to `logs/security_audit.jsonl`.
+- **Developer CLI Tooling (`scripts/`):**
+  - `scripts/system_check.py`: Safe host hardware inspection and runtime budgeting.
+  - `scripts/gpu_check.py`: GPU and CUDA compatibility inspection (gracefully handles CPU workstation).
+  - `scripts/environment_check.py`: Toolchain audit (Python, PyTorch, JAX, compilers, Git, Docker).
+  - `scripts/storage_check.py`: Storage tiering, disk space, and sequential I/O benchmark.
+- **Configuration Templates (`configs/`):**
+  - `configs/infrastructure/cluster_tier_a_dev.yaml`
+  - `configs/infrastructure/cluster_tier_b_research.yaml`
+  - `configs/infrastructure/cluster_tier_c_training.yaml`
+  - `configs/training/fsdp_config.yaml`
+  - `configs/training/distributed_mesh.yaml`
+  - `configs/environments/pytorch_cuda_env.yaml`
+  - `configs/environments/jax_cluster_env.yaml`
+- **8 Technical Architecture Manuals in `docs/`:**
+  - [`docs/GPU_CLUSTER_ARCHITECTURE.md`](docs/GPU_CLUSTER_ARCHITECTURE.md) (`DOC-INFRA-001`)
+  - [`docs/DISTRIBUTED_TRAINING.md`](docs/DISTRIBUTED_TRAINING.md) (`DOC-INFRA-002`)
+  - [`docs/PYTORCH_JAX_INFRASTRUCTURE.md`](docs/PYTORCH_JAX_INFRASTRUCTURE.md) (`DOC-INFRA-003`)
+  - [`docs/CUDA_COMPATIBILITY.md`](docs/CUDA_COMPATIBILITY.md) (`DOC-INFRA-004`)
+  - [`docs/STORAGE_ARCHITECTURE.md`](docs/STORAGE_ARCHITECTURE.md) (`DOC-INFRA-005`)
+  - [`docs/INFRASTRUCTURE_SECURITY.md`](docs/INFRASTRUCTURE_SECURITY.md) (`DOC-INFRA-006`)
+  - [`docs/TRAINING_COMPUTE_ESTIMATION.md`](docs/TRAINING_COMPUTE_ESTIMATION.md) (`DOC-INFRA-007`)
+  - [`docs/INFRASTRUCTURE_COST_ANALYSIS.md`](docs/INFRASTRUCTURE_COST_ANALYSIS.md) (`DOC-INFRA-008`)
+- **Automated Test Suites (25 New Tests in `tests/`):**
+  - `tests/infrastructure/test_local_hardware.py` (3 tests)
+  - `tests/infrastructure/test_cluster_architecture.py` (5 tests)
+  - `tests/infrastructure/test_distributed_training.py` (5 tests)
+  - `tests/infrastructure/test_storage_vault.py` (4 tests)
+  - `tests/infrastructure/test_cluster_security.py` (4 tests)
+  - `tests/configuration/test_infrastructure_configs.py` (4 tests)
+
+### Changed
+- Expanded `tests/architecture/test_architecture_consistency.py` to assert new infrastructure subpackages (`containers`, `distributed`, `storage`, `monitoring`, `security`) and all 28 technical manuals.
+- Re-exported all new infrastructure classes in top-level `infrastructure/__init__.py`.
+- Updated `README.md` with complete Phase 05 infrastructure specifications, cluster diagrams, and quickstart commands.
+- Updated `PHASE_STATUS.md` and `DEVELOPMENT_LOG.md` preserving full records of Phases 01, 02, 03, and 04.
+
+### Verified
+- Executed `pytest tests/`: **98 tests passed in 1.88 seconds on CPU (100% success rate)**.
+
+---
+
 ## [Phase-04] - 2026-11-06
 
 ### Added

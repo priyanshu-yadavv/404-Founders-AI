@@ -1,0 +1,32 @@
+# 404 FOUNDERS — PyTorch CUDA Distributed Training Environment Specification
+environment_name: "404-founders-pytorch-cuda12"
+python_version: "3.11.9"
+
+runtime_matrix:
+  cuda_version: "12.4.1"
+  cudnn_version: "9.1.0"
+  nccl_version: "2.21.5"
+  torch_version: "2.4.0"
+  torchvision_version: "0.19.0"
+  triton_version: "3.0.0"
+
+accelerator_libraries:
+  flash_attention: "2.5.8"
+  deepspeed: "0.14.4"
+  megatron_core: "0.6.0"
+
+environment_variables:
+  # Overlap Tensor Parallel / Sequence Parallel communication with forward/backward GEMM
+  CUDA_DEVICE_MAX_CONNECTIONS: "1"
+  # Avoid memory fragmentation through expandable virtual memory segments
+  PYTORCH_CUDA_ALLOC_CONF: "expandable_segments:True,max_split_size_mb:512"
+  # NCCL GPU Direct RDMA and Rail-optimized InfiniBand flags
+  TORCH_NCCL_AVOID_RECORD_STREAMS: "1"
+  NCCL_DEBUG: "INFO"
+  NCCL_DEBUG_SUBSYS: "INIT,COLL,ENV"
+  NCCL_NET_GDR_LEVEL: "5"
+  NCCL_IB_TIMEOUT: "22"
+  NCCL_IB_RETRY_CNT: "7"
+  # OMP threads per rank on NUMA nodes
+  OMP_NUM_THREADS: "16"
+  PYTHONFAULTHANDLER: "1"

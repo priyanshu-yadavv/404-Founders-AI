@@ -1,0 +1,38 @@
+# 404 FOUNDERS — Cluster Tier A (Development & Prototyping) Configuration
+tier: "Tier A — Development"
+target_environment: "cloud_workstation"
+accelerators:
+  gpu_model: "NVIDIA RTX 4090 / NVIDIA L40S"
+  gpu_count: 2
+  vram_per_gpu_gb: 24
+  total_vram_gb: 48
+  fp8_support: true
+  bfloat16_peak_tflops: 330.0
+
+host:
+  cpu_model: "AMD EPYC 9354 32-Core Processor or equivalent"
+  cpu_cores: 32
+  system_ram_gb: 128
+  os: "Ubuntu 22.04 LTS"
+
+interconnect:
+  intra_node: "PCIe Gen 4.0 x16 (64 GB/s bi-directional)"
+  inter_node: "10 Gbps Ethernet (isolated prototyping only)"
+
+storage:
+  hot_nvme_scratch_tb: 2.0
+  warm_fs_tb: 10.0
+  cold_object_storage_tb: 25.0
+
+parallelism_defaults:
+  data_parallel_size: 2
+  tensor_parallel_size: 1
+  pipeline_parallel_size: 1
+  sequence_parallel_size: 1
+  fsdp_sharding_strategy: "SHARD_GRAD_OP"
+  mixed_precision: "bfloat16"
+
+purpose:
+  - "Module unit testing and smoke runs"
+  - "BPE tokenizer training verification"
+  - "Small-scale synthetic convergence checks (<100M params)"

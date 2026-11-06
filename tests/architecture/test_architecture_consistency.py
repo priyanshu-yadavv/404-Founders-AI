@@ -78,6 +78,11 @@ EXPECTED_PACKAGES = [
     "infrastructure.local",
     "infrastructure.cloud",
     "infrastructure.gpu_cluster",
+    "infrastructure.containers",
+    "infrastructure.distributed",
+    "infrastructure.storage",
+    "infrastructure.monitoring",
+    "infrastructure.security",
     "infrastructure.deployment",
     "database",
     "security",
@@ -105,6 +110,14 @@ EXPECTED_DOCS = [
     "docs/DATA_PIPELINE.md",
     "docs/DATA_GOVERNANCE.md",
     "docs/DATASET_LICENSE_POLICY.md",
+    "docs/GPU_CLUSTER_ARCHITECTURE.md",
+    "docs/DISTRIBUTED_TRAINING.md",
+    "docs/PYTORCH_JAX_INFRASTRUCTURE.md",
+    "docs/CUDA_COMPATIBILITY.md",
+    "docs/STORAGE_ARCHITECTURE.md",
+    "docs/INFRASTRUCTURE_SECURITY.md",
+    "docs/TRAINING_COMPUTE_ESTIMATION.md",
+    "docs/INFRASTRUCTURE_COST_ANALYSIS.md",
 ]
 
 

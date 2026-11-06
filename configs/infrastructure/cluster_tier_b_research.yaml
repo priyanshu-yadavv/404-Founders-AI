@@ -1,0 +1,38 @@
+# 404 FOUNDERS — Cluster Tier B (Research & Scaling Validation) Configuration
+tier: "Tier B — Research"
+target_environment: "single_node_supercomputer"
+accelerators:
+  gpu_model: "NVIDIA H100 80GB SXM5"
+  gpu_count: 8
+  vram_per_gpu_gb: 80
+  total_vram_gb: 640
+  fp8_support: true
+  bfloat16_peak_tflops: 989.0
+
+host:
+  cpu_model: "Dual Intel Xeon Platinum 8480+ (112 cores total)"
+  cpu_cores: 112
+  system_ram_gb: 1024
+  os: "Ubuntu 22.04 LTS with NVIDIA Enroot/Pyxis container runtime"
+
+interconnect:
+  intra_node: "NVIDIA NVLink 4 (900 GB/s bi-directional per GPU, 7.2 TB/s aggregate NVSwitch mesh)"
+  inter_node: "Single-node topology (no external InfiniBand required for single node)"
+
+storage:
+  hot_nvme_scratch_tb: 15.0
+  warm_fs_tb: 50.0
+  cold_object_storage_tb: 100.0
+
+parallelism_defaults:
+  data_parallel_size: 1
+  tensor_parallel_size: 4
+  pipeline_parallel_size: 1
+  sequence_parallel_size: 2
+  fsdp_sharding_strategy: "FULL_SHARD"
+  mixed_precision: "bfloat16"
+
+purpose:
+  - "Custom attention mechanism benchmarking (Global + Sparse + Hierarchical)"
+  - "Routing loss convergence for MoE / Modular components"
+  - "Research scale model training (1B to 7B parameters)"

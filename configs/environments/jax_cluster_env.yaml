@@ -1,0 +1,29 @@
+# 404 FOUNDERS — JAX Distributed TPU/GPU Supercluster Environment Specification
+environment_name: "404-founders-jax-cuda12"
+python_version: "3.11.9"
+
+runtime_matrix:
+  cuda_version: "12.4.1"
+  cudnn_version: "9.1.0"
+  jax_version: "0.4.30"
+  jaxlib_version: "0.4.30+cuda12.cudnn91"
+  flax_version: "0.8.4"
+  optax_version: "0.2.2"
+
+distributed_runtime:
+  coordinator_bind_address: "0.0.0.0:1234"
+  heartbeat_interval_secs: 10
+  initialization_timeout_secs: 300
+
+xla_flags:
+  - "--xla_gpu_enable_latency_hiding_scheduler=true"
+  - "--xla_gpu_all_gather_combine_threshold_bytes=1073741824"
+  - "--xla_gpu_all_reduce_combine_threshold_bytes=1073741824"
+  - "--xla_gpu_enable_triton_gemm=true"
+  - "--xla_gpu_graph_level=2"
+
+environment_variables:
+  XLA_PYTHON_CLIENT_PREALLOCATE: "false"
+  XLA_PYTHON_CLIENT_MEM_FRACTION: "0.90"
+  TF_FORCE_GPU_ALLOW_GROWTH: "true"
+  JAX_TRACEBACK_FILTERING: "off"
