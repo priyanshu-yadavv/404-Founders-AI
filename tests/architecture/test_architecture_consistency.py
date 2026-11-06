@@ -47,6 +47,14 @@ EXPECTED_PACKAGES = [
     "learning.meta_learning",
     "training",
     "training.datasets",
+    "training.datasets.ingestion",
+    "training.datasets.validation",
+    "training.datasets.cleaning",
+    "training.datasets.deduplication",
+    "training.datasets.governance",
+    "training.datasets.splitting",
+    "training.datasets.manifests",
+    "training.datasets.statistics",
     "training.preprocessing",
     "training.experiments",
     "training.checkpoints",
@@ -91,6 +99,12 @@ EXPECTED_DOCS = [
     "docs/CUSTOM_ATTENTION_DESIGN.md",
     "docs/NEURAL_ROUTING_DESIGN.md",
     "docs/MODEL_INITIALIZATION.md",
+    "docs/CUSTOM_BPE_TOKENIZER.md",
+    "docs/TOKENIZER_TRAINING.md",
+    "docs/MULTILINGUAL_TOKENIZATION.md",
+    "docs/DATA_PIPELINE.md",
+    "docs/DATA_GOVERNANCE.md",
+    "docs/DATASET_LICENSE_POLICY.md",
 ]
 
 

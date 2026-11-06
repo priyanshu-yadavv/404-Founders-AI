@@ -1,0 +1,65 @@
+# 404 FOUNDERS — Default Tokenizer Configuration
+# Custom Character-Based Byte Pair Encoding (BPE)
+
+vocab_size: 1024               # Experimental prototype vocabulary size
+min_frequency: 2               # Minimum occurrence frequency to merge
+normalization: "NFC"           # Canonical Unicode normalization
+whitespace_symbol: " "         # Unicode \u2581 (Lower One Eighth Block)
+unknown_token: "<unk>"
+pad_token: "<pad>"
+bos_token: "<bos>"
+eos_token: "<eos>"
+preserve_case: true
+max_token_length: 64
+
+# Supported Target Languages
+target_languages:
+  - "en"                       # English
+  - "hi"                       # Hindi (Devanagari)
+  - "es"                       # Spanish
+  - "fr"                       # French
+  - "de"                       # German
+  - "ru"                       # Russian (Cyrillic)
+  - "zh"                       # Chinese (CJK)
+  - "ar"                       # Arabic
+
+# Supported Code and Technical Syntax
+target_code_languages:
+  - "python"
+  - "cpp"
+  - "rust"
+  - "javascript"
+  - "typescript"
+  - "sql"
+  - "bash"
+  - "json"
+  - "yaml"
+  - "markdown"
+
+# Reserved Special Control Tokens
+special_tokens:
+  - "<pad>"                    # ID: 0
+  - "<unk>"                    # ID: 1
+  - "<bos>"                    # ID: 2
+  - "<eos>"                    # ID: 3
+  - "<eot>"                    # ID: 4 (End of Turn)
+  - "<sys_start>"              # ID: 5
+  - "<sys_end>"                # ID: 6
+  - "<user_start>"             # ID: 7
+  - "<user_end>"               # ID: 8
+  - "<asst_start>"             # ID: 9
+  - "<asst_end>"               # ID: 10
+  - "<thought>"                # ID: 11
+  - "</thought>"               # ID: 12
+  - "<tool_call>"              # ID: 13
+  - "<tool_result>"            # ID: 14
+  - "<image>"                  # ID: 15
+  - "</image>"                 # ID: 16
+  - "<audio>"                  # ID: 17
+  - "</audio>"                 # ID: 18
+  - "<video>"                  # ID: 19
+  - "</video>"                 # ID: 20
+  - "<spatial>"                # ID: 21
+  - "</spatial>"               # ID: 22
+  - "<code_start>"             # ID: 23
+  - "<code_end>"               # ID: 24

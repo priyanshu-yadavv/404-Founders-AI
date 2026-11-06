@@ -154,3 +154,63 @@ Authored 4 technical specification manuals in `docs/`:
   - `tests/architecture/test_architecture_consistency.py` (4 tests)
 - **Results: 44 passed in 1.49s (100% success rate on CPU).**
 - Committed Phase 03 deliverables: Commit `ea2577f` (`add new commit 2 time`).
+
+---
+
+## [2026-11-06T21:00:00+05:30] — Phase 04: Custom BPE Tokenizer & Data Preparation Pipeline
+
+### 1. Tokenizer Architecture & Design Alignment
+- **Character-Level Custom BPE Decision:** Formally rejected Byte-Level BPE (BBPE) to prevent 3-byte fragmentation of Devanagari/Hindi and Asian scripts. Implemented custom character/grapheme Byte Pair Encoding using Unicode NFC canonical normalization.
+- **Whitespace Representation:** Built lossless whitespace round-trip preservation utilizing the visible boundary meta-character ` ` (`\u2581`), ensuring exact string reproduction without arbitrary space insertions.
+- **Pre-Tokenizer Regex:** Engineered non-destructive pre-tokenization recognizing multi-character code operators (`==`, `!=`, `<=`, `>=`, `->`, `::`, `+=`, `//`, `**`), exponential scientific numbers (`6.626e-34`), and multilingual graphemes (Hindi vowels, mātrās, viramas).
+
+### 2. Special Tokens Registry & Subword BPE Segmentation
+- **Special Token Registry (`tokenizer/special_tokens.py`):** Established 25 canonical special tokens (`<pad>`, `<unk>`, `<bos>`, `<eos>`, `<eot>`, `<sys_start>`, `<sys_end>`, `<user_start>`, `<user_end>`, `<asst_start>`, `<asst_end>`, `<thought>`, `</thought>`, `<tool_call>`, `<tool_result>`, `<image>`, `</image>`, `<audio>`, `</audio>`, `<video>`, `</video>`, `<spatial>`, `</spatial>`, `<code_start>`, `<code_end>`) mapped to stable IDs `0` through `24`.
+- **Atomic Regex Matching:** Special tokens are extracted atomically prior to BPE character splitting, strictly preventing merge rules from fragmenting control tags.
+- **Priority-Ranked BPE Segmentation (`tokenizer/encoder.py`):** Iteratively identifies and replaces adjacent subword pairs with minimum merge rank until convergence.
+
+### 3. Multilingual, Code & Mathematical Tokenization
+- **Hindi / Devanagari:** Verified atomic character and conjunct handling across vowels, consonants, mātrās, and virama halant (`नमस्ते भारत`, `कृत्रिम बुद्धिमत्ता`).
+- **Code Syntax:** Verified preservation of Python, Rust, C++, SQL, Bash keywords, brackets, and multi-char operators.
+- **Math & Science:** Verified LaTeX integral expressions ($f(x) = \int e^{-x^2} dx$) and scientific notation (`1.234e-05 <= alpha <= 9.876e+02`).
+- **Evaluation Engine (`tokenizer/evaluation/`):** Built quantitative measurement of compression ratio (bytes/token), tokens per word, fertility, and round-trip parity.
+
+### 4. Data Preparation Pipeline Implementation
+- **Ingestion (`training/datasets/ingestion/`):** Multi-format reader (`.jsonl`, `.csv`, `.txt`, `.json`) ingesting into typed `DataRecord` streams across 9 domains.
+- **Validation (`training/datasets/validation/`):** Stream validator checking file format extensions, UTF-8 byte integrity, schema requirements, and workstation file size limits (100 MB).
+- **Cleaning & Quality Filtering (`training/datasets/cleaning/`):** Text sanitization, null byte removal, consecutive newline compaction, symbol-to-word ratio checks, line repetition loop detection, and heuristic language identification.
+- **Deduplication (`training/datasets/deduplication/`):** Content SHA-256 exact deduplication combined with 32-permutation MinHash near-duplicate detection at 0.85 Jaccard similarity.
+- **Zero-Leakage Splitting (`training/datasets/splitting/`):** Deterministic content-hash partitioning ($\text{SHA256}(x) \pmod{1000}$) into Train (80%), Val (10%), and Test (10%), mathematically eliminating cross-split data leakage.
+- **Cryptographic Manifests (`training/datasets/manifests/`):** Generates immutable JSON manifests tracking record volumes, byte counts, domain breakdowns, and per-file SHA-256 checksums with on-disk verification.
+- **Descriptive Statistics (`training/datasets/statistics/`):** Aggregates corpus statistics, token counts, and formats Markdown audit tables.
+
+### 5. Governance, License Compliance & PII Redaction
+- **License Whitelist (`DataGovernanceEngine`):** Allows only approved permissive licenses (Apache 2.0, MIT, BSD, CC-BY, CC0, OpenData, Synthetic); strictly flags and rejects copyleft (GPL, AGPL) and non-commercial licenses (CC-NC).
+- **PII & Secret Detection:** Regex scanning engine intercepting AWS keys, GitHub tokens, OpenAI API keys, SSH private keys, private IP addresses, emails, SSNs, and credit cards with automated canonical redaction (`[REDACTED_API_KEY]`, `[REDACTED_EMAIL]`, etc.).
+
+### 6. Developer CLI Tooling
+- Implemented executable developer scripts in `scripts/`:
+  - `scripts/train_tokenizer.py`: Train custom BPE models from corpus files.
+  - `scripts/encode_text.py`: Encode strings to token IDs with optional BOS/EOS tags.
+  - `scripts/decode_tokens.py`: Decode token IDs back into formatted text.
+  - `scripts/inspect_dataset.py`: Comprehensive dataset validation, cleaning, governance audit, and statistical reporting.
+
+### 7. Documentation Authored
+Authored 6 comprehensive technical specifications in `docs/`:
+- [`docs/CUSTOM_BPE_TOKENIZER.md`](docs/CUSTOM_BPE_TOKENIZER.md) (`DOC-TOK-001`)
+- [`docs/TOKENIZER_TRAINING.md`](docs/TOKENIZER_TRAINING.md) (`DOC-TOK-002`)
+- [`docs/MULTILINGUAL_TOKENIZATION.md`](docs/MULTILINGUAL_TOKENIZATION.md) (`DOC-TOK-003`)
+- [`docs/DATA_PIPELINE.md`](docs/DATA_PIPELINE.md) (`DOC-DATA-001`)
+- [`docs/DATA_GOVERNANCE.md`](docs/DATA_GOVERNANCE.md) (`DOC-DATA-002`)
+- [`docs/DATASET_LICENSE_POLICY.md`](docs/DATASET_LICENSE_POLICY.md) (`DOC-DATA-003`)
+
+### 8. Testing & Validation
+- Executed full test suite across 73 automated tests:
+  - `tests/tokenizer/test_bpe_tokenizer.py` (8 tests)
+  - `tests/tokenizer/test_multilingual_code.py` (5 tests)
+  - `tests/data_pipeline/test_data_validation.py` (6 tests)
+  - `tests/data_pipeline/test_cleaning_dedup.py` (5 tests)
+  - `tests/data_pipeline/test_governance_splitting.py` (5 tests)
+  - All 44 Phase 02 and Phase 03 tests passing.
+- **Results: 73 passed in 1.74s (100% success rate on CPU).**
+- Staged all Phase 04 changes awaiting user review.

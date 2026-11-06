@@ -5,6 +5,62 @@ All notable changes to the 404 FOUNDERS project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to Phase-based Development Governance.
 
+## [Phase-04] - 2026-11-06
+
+### Added
+- **Custom BPE Tokenizer (`tokenizer/`):**
+  - `CustomBPETokenizer`: Unified model interface supporting training from text iterators, subword encoding, lossless decoding, and JSON serialization.
+  - Character-level Byte Pair Encoding (non-byte-level BPE), eliminating byte-fragmentation for Indic and multilingual scripts.
+  - `BPETrainer` (`tokenizer/bpe_trainer.py`): Pair frequency calculation ($F(p_1, p_2) = \sum C(w) \cdot \text{count}$) with deterministic tie-breaking.
+  - `PreTokenizer` (`tokenizer/pre_tokenizer.py`): Multi-character code operator detection, scientific notation preservation, multilingual grapheme cluster handling, and explicit whitespace representation (` ` / `\u2581`).
+  - `TextNormalizer` (`tokenizer/normalization.py`): Non-destructive Unicode NFC/NFKC canonical normalization, newline unification (`\r\n` -> `\n`), and control character sanitization.
+  - `SpecialTokenRegistry` (`tokenizer/special_tokens.py`): 25 canonical special tokens (`<pad>`, `<unk>`, `<bos>`, `<eos>`, `<eot>`, `<sys_start>`, `<sys_end>`, `<user_start>`, `<user_end>`, `<asst_start>`, `<asst_end>`, `<thought>`, `</thought>`, `<tool_call>`, `<tool_result>`, `<image>`, `</image>`, `<audio>`, `</audio>`, `<video>`, `</video>`, `<spatial>`, `</spatial>`, `<code_start>`, `<code_end>`) with atomic regex matching and stable ID mapping.
+  - `Vocabulary` (`tokenizer/vocabulary/manager.py`): Bi-directional token-to-ID and ID-to-token lookup with unknown token fallback.
+  - `BPEEncoder` (`tokenizer/encoder.py`) & `BPEDecoder` (`tokenizer/decoder.py`): Priority-ranked iterative subword merging and exact round-trip text reconstruction.
+  - `TokenizerSerializer` (`tokenizer/serialization.py`): Standalone JSON model serialization and separate `vocab.json` / `merges.txt` export.
+  - `TokenizerEvaluator` (`tokenizer/evaluation/evaluator.py`): Quantitative benchmarking for compression ratio, tokens per word, fertility, OOV rate, and round-trip parity.
+- **Data Preparation Pipeline (`training/datasets/`):**
+  - `DatasetIngestor` (`training/datasets/ingestion/`): Ingestion across 9 domains (`general_text`, `code`, `mathematics`, `scientific`, `cybersecurity`, `multilingual`, `instruction`, `synthetic`, `multimodal_metadata`) supporting JSONL, CSV, and plain text.
+  - `DataValidator` (`training/datasets/validation/`): Format validation, UTF-8 integrity, schema enforcement, corrupted line detection, and workstation file size bounds.
+  - `DataCleaner` (`training/datasets/cleaning/`): Text sanitization, symbol-to-word ratio filtering, repetition loop rejection, and heuristic language/code identification.
+  - `Deduplicator` (`training/datasets/deduplication/`): Content SHA-256 exact deduplication and 32-permutation MinHash near-duplicate detection with Jaccard estimation.
+  - `DataGovernanceEngine` (`training/datasets/governance/`): Provenance tracking, license whitelist compliance (Apache 2.0, MIT, BSD, CC-BY, CC0, OpenData, Synthetic), and regex PII/secret scanning & redaction (AWS keys, GitHub tokens, OpenAI keys, SSH private keys, private IPs, emails, SSNs, credit cards).
+  - `DatasetSplitter` (`training/datasets/splitting/`): Zero-leakage deterministic hash partitioning ($\text{SHA256}(x) \pmod{1000}$) across Train (80%), Val (10%), and Test (10%).
+  - `DatasetManifest` (`training/datasets/manifests/`): Cryptographic manifests tracking split records, byte volumes, domain distributions, and per-file SHA-256 checksums with disk verification.
+  - `DatasetStatistics` (`training/datasets/statistics/`): Descriptive corpus statistics, subword token estimates, and formatted Markdown audit reporting.
+- **Developer CLI Tooling (`scripts/`):**
+  - `scripts/train_tokenizer.py`: Train custom BPE models from corpus files.
+  - `scripts/encode_text.py`: Encode strings to token IDs with optional BOS/EOS tags.
+  - `scripts/decode_tokens.py`: Decode token IDs back into formatted text.
+  - `scripts/inspect_dataset.py`: Comprehensive dataset validation, cleaning, governance audit, and statistical reporting.
+- **Configuration Templates (`configs/`):**
+  - `configs/tokenizer/default_tokenizer.yaml`
+  - `configs/datasets/pipeline_config.yaml`
+- **6 Technical Architecture Manuals in `docs/`:**
+  - [`docs/CUSTOM_BPE_TOKENIZER.md`](docs/CUSTOM_BPE_TOKENIZER.md) (`DOC-TOK-001`)
+  - [`docs/TOKENIZER_TRAINING.md`](docs/TOKENIZER_TRAINING.md) (`DOC-TOK-002`)
+  - [`docs/MULTILINGUAL_TOKENIZATION.md`](docs/MULTILINGUAL_TOKENIZATION.md) (`DOC-TOK-003`)
+  - [`docs/DATA_PIPELINE.md`](docs/DATA_PIPELINE.md) (`DOC-DATA-001`)
+  - [`docs/DATA_GOVERNANCE.md`](docs/DATA_GOVERNANCE.md) (`DOC-DATA-002`)
+  - [`docs/DATASET_LICENSE_POLICY.md`](docs/DATASET_LICENSE_POLICY.md) (`DOC-DATA-003`)
+- **Automated Test Suites (29 New Tests in `tests/`):**
+  - `tests/tokenizer/test_bpe_tokenizer.py` (8 tests)
+  - `tests/tokenizer/test_multilingual_code.py` (5 tests)
+  - `tests/data_pipeline/test_data_validation.py` (6 tests)
+  - `tests/data_pipeline/test_cleaning_dedup.py` (5 tests)
+  - `tests/data_pipeline/test_governance_splitting.py` (5 tests)
+
+### Changed
+- Expanded `tests/architecture/test_architecture_consistency.py` to verify all 8 dataset subpackages and 20 architectural manuals.
+- Updated `.gitignore` to prevent raw dataset storage (`data/raw/`, `data/processed/`, `*.parquet`, archives) from being committed to repository.
+- Expanded `README.md` to reflect Phase 04 Custom BPE Tokenizer and Data Pipeline components, documentation index, and quickstart commands.
+- Updated `PHASE_STATUS.md` and `DEVELOPMENT_LOG.md` preserving full historical records of Phases 01, 02, and 03.
+
+### Verified
+- Executed `pytest tests/`: **73 tests passed in 1.74 seconds on CPU (100% success rate)**.
+
+---
+
 ## [Phase-03] - 2026-11-06
 
 ### Added

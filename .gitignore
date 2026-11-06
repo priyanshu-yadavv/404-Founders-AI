@@ -107,6 +107,14 @@ lerna-debug.log*
 *.tflite
 models/checkpoints/
 
+# Dataset storage & raw data artifacts (never commit raw datasets)
+data/raw/
+data/processed/
+*.parquet
+*.arrow
+*.tar.gz
+*.zip
+
 # System and OS Files
 .DS_Store
 .DS_Store?

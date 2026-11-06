@@ -1,0 +1,64 @@
+# 404 FOUNDERS — Data Pipeline Configuration
+# Governed ingestion, cleaning, deduplication, and splitting pipeline
+
+pipeline_version: "1.0.0"
+
+# Storage and Directories
+data_root: "data/"
+raw_dir: "data/raw/"
+processed_dir: "data/processed/"
+manifests_dir: "data/manifests/"
+
+# Ingestion & Validation
+validation:
+  allowed_extensions:
+    - ".jsonl"
+    - ".json"
+    - ".csv"
+    - ".txt"
+    - ".parquet"
+    - ".md"
+  max_file_size_bytes: 104857600   # 100 MB safe limit per file
+  min_content_length: 5
+  max_content_length: 1000000
+  allowed_encodings:
+    - "utf-8"
+
+# Cleaning & Normalization
+cleaning:
+  unicode_normalization: "NFC"
+  strip_null_bytes: true
+  min_words: 3
+  max_symbol_ratio: 0.50
+  max_repetition_ratio: 0.40
+
+# Deduplication (Exact + Near-Duplicate)
+deduplication:
+  enable_exact_dedup: true
+  enable_near_dedup: true
+  near_duplicate_threshold: 0.85
+  minhash_num_permutations: 32
+  shingle_k: 5
+
+# Data Governance & Security
+governance:
+  redact_pii: true
+  approved_licenses:
+    - "Apache-2.0"
+    - "MIT"
+    - "BSD-2-Clause"
+    - "BSD-3-Clause"
+    - "CC-BY-4.0"
+    - "CC0-1.0"
+    - "OpenData"
+    - "Synthetic-Internal"
+    - "Public-Domain"
+  scan_for_secrets: true
+
+# Dataset Splitting (Hash-Partitioned Zero-Leakage)
+splitting:
+  method: "hash"
+  train_ratio: 0.80
+  val_ratio: 0.10
+  test_ratio: 0.10
+  random_seed: 404

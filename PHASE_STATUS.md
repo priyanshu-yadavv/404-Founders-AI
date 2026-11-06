@@ -4,12 +4,12 @@
 - **Project Name:** 404 FOUNDERS
 - **Tagline:** Intelligence Without Boundaries
 - **System Architecture:** Custom Multimodal Foundation AI + Personal AI Operating Intelligence System
-- **Lead Roles:** Principal AI Research Engineer & Chief Software Architect
+- **Lead Roles:** Principal NLP Engineer, Tokenization Researcher & Data Engineering Architect
 - **Repository:** `https://github.com/priyanshu-yadavv/404-Founders-AI.git`
 - **Active Branch:** `main`
-- **Current Phase:** Phase 03 — Core AI Foundation Development
-- **Current Phase Status:** Implementation Complete — Verified & Committed (Commit `ea2577f`), Documentation Restored
-- **Last Updated:** 2026-11-06T20:30:00+05:30
+- **Current Phase:** Phase 04 — Custom BPE Tokenizer & Data Pipeline
+- **Current Phase Status:** Implementation Complete — Proposed Changes Ready for User Review (73/73 tests passing)
+- **Last Updated:** 2026-11-06T21:05:00+05:30
 
 ---
 
@@ -19,9 +19,9 @@
 |---|---|---|---|---|
 | **Phase 01** | **Environment & Hardware Assessment** | **Completed** | Commit `0215368`, [`docs/phase-01-hardware-assessment.md`](docs/phase-01-hardware-assessment.md) | Verified & Closed |
 | **Phase 02** | **Project Architecture & Workspace Design** | **Completed** | Commit `26ff5c6`, 10 Architecture Specs, Modular Packages, Security Engine | Verified & Closed |
-| **Phase 03** | **Core AI Foundation Development** | **Completed (Audit & Review)** | Commit `ea2577f`, Central Neural Core, Custom Attention (4), Neural Routing (3), Inference Engine | Verified (44/44 tests passed) |
-| Phase 04 | Neural Architecture & Model Prototyping | Planned | Scaling Transformer Blocks, Extended Micro-Models, FSDP Pretraining Setup | Pending Phase 03 Sign-Off |
-| Phase 05 | Personal AI Assistant & Endpoint Core | Planned | OS Telemetry Engine, AST Code Reviewer, Defensive Cyber Scanner | Pending Phase 04 |
+| **Phase 03** | **Core AI Foundation Development** | **Completed** | Commits `ea2577f` & `62e5a70`, Central Neural Core, Custom Attention (4), Dynamic Routing, Inference Engine | Verified & Closed |
+| **Phase 04** | **Custom BPE Tokenizer & Data Pipeline** | **Review Pending** | Character BPE Tokenizer, Data Ingestion/Cleaning/MinHash Dedup, Governance & Manifests, 6 Manuals | Awaiting User Approval to Commit |
+| Phase 05 | Personal AI Assistant & Endpoint Core | Planned | OS Telemetry Engine, AST Code Reviewer, Defensive Cyber Scanner | Pending Phase 04 Sign-Off |
 | Phase 06 | Tri-Protocol API Services & Client Interface | Planned | FastAPI Endpoints, WebSocket Streamer, gRPC Inter-Node, Desktop Client | Pending Phase 05 |
 | Phase 07 | Testing, Security Audit & Performance Benchmarking | Planned | E2E Benchmark Suite, Fuzzing, Penetration Audit | Pending Phase 06 |
 | Phase 08 | Production Deployment & Hybrid Cluster CI/CD | Planned | Slurm Multi-Node Harness, Systemd Daemons, Hybrid CI/CD | Pending Phase 07 |
@@ -81,7 +81,7 @@
 
 ---
 
-## Phase 03 Breakdown: Core AI Foundation Development (Completed / Audit & Review)
+## Phase 03 Breakdown: Core AI Foundation Development (Completed)
 
 ### Objectives
 1. Implement the central neural processing interface (`NeuralCore`) coordinating input embeddings, hierarchical transformer blocks, dynamic routing, specialized domain experts, and output predictions.
@@ -104,7 +104,7 @@
    - `docs/NEURAL_ROUTING_DESIGN.md`
    - `docs/MODEL_INITIALIZATION.md`
 9. Develop and execute test suite covering all 10 required verification categories on CPU.
-10. Stage changes, commit (`ea2577f`), and verify test suite integrity.
+10. Stage changes and verify test suite integrity.
 
 ### Task Checklist
 - [x] Implement `neural_architecture/layers/normalization.py` (`CustomRMSNorm`).
@@ -128,13 +128,73 @@
   - [x] `docs/MODEL_INITIALIZATION.md`
 - [x] Build and run test suite: **44 tests passed in 1.49s (100% success rate on CPU)**.
 - [x] Update `README.md`, `PHASE_STATUS.md`, `DEVELOPMENT_LOG.md`, `CHANGELOG.md`.
-- [x] Commit Phase 03 deliverables: Commit `ea2577f` (`add new commit 2 time`).
+- [x] Commit Phase 03 deliverables: Commits `ea2577f` and `62e5a70`.
+
+---
+
+## Phase 04 Breakdown: Custom BPE Tokenizer & Data Pipeline (Review Pending)
+
+### Objectives
+1. Implement independent Custom Character-Level BPE Tokenizer (non-byte-level BPE), avoiding 3-byte fragmentation for Hindi and Indic scripts.
+2. Build non-destructive pre-tokenization recognizing code operators (`==`, `!=`, `->`, `::`), scientific notation (`6.626e-34`), and Devanagari grapheme clusters with explicit whitespace representation (` ` / `\u2581`).
+3. Design and implement the 25-token special tokens registry with isolated stable IDs (0 to 24) and atomic regex matching.
+4. Build subword BPE training engine (`BPETrainer`) with deterministic greedy pair selection and tie-breaking.
+5. Create encoder (`BPEEncoder`) and decoder (`BPEDecoder`) guaranteeing exact round-trip text reconstruction.
+6. Implement tokenization evaluation engine (`TokenizerEvaluator`) measuring compression ratio, tokens per word, fertility, and OOV rates.
+7. Build modular data pipeline subsystems: Ingestion (`DatasetIngestor`), Validation (`DataValidator`), Cleaning (`DataCleaner`), Deduplication (`Deduplicator` via exact SHA-256 + MinHash Jaccard), Governance (`DataGovernanceEngine`), Splitting (`DatasetSplitter`), Manifests (`DatasetManifest`), and Statistics (`DatasetStatistics`).
+8. Implement deterministic hash-partitioned dataset splitting ($\text{SHA256}(x) \pmod{1000}$) guaranteeing zero cross-split data leakage.
+9. Implement PII/secret regex scanner and canonical redactor, plus license whitelist compliance checking.
+10. Author 6 comprehensive technical specifications in `docs/`:
+    - `docs/CUSTOM_BPE_TOKENIZER.md`
+    - `docs/TOKENIZER_TRAINING.md`
+    - `docs/MULTILINGUAL_TOKENIZATION.md`
+    - `docs/DATA_PIPELINE.md`
+    - `docs/DATA_GOVERNANCE.md`
+    - `docs/DATASET_LICENSE_POLICY.md`
+11. Build CLI developer scripts in `scripts/` (`train_tokenizer.py`, `encode_text.py`, `decode_tokens.py`, `inspect_dataset.py`).
+12. Establish automated test suite covering all 16 prompt requirements: **73 tests passed in 1.74s (100% success rate on CPU)**.
+13. Stage changes and prepare completion report awaiting user review.
+
+### Task Checklist
+- [x] Implement `tokenizer/config.py` (`TokenizerConfig`).
+- [x] Implement `tokenizer/special_tokens.py` (`SpecialTokenRegistry`, 25 canonical tokens).
+- [x] Implement `tokenizer/normalization.py` (`TextNormalizer`, Unicode NFC/NFKC).
+- [x] Implement `tokenizer/pre_tokenizer.py` (`PreTokenizer`, code operators, Indic letters, ` `).
+- [x] Implement `tokenizer/vocabulary/manager.py` (`Vocabulary`).
+- [x] Implement `tokenizer/bpe_trainer.py` (`BPETrainer`, pair frequencies, deterministic tie-breaking).
+- [x] Implement `tokenizer/encoder.py` (`BPEEncoder`, `EncodingResult`).
+- [x] Implement `tokenizer/decoder.py` (`BPEDecoder`, lossless text reconstruction).
+- [x] Implement `tokenizer/serialization.py` (`TokenizerSerializer`, JSON model and vocab/merges export).
+- [x] Implement `tokenizer/evaluation/evaluator.py` (`TokenizerEvaluator`, `TokenizerMetrics`).
+- [x] Implement `tokenizer/bpe_tokenizer.py` (`CustomBPETokenizer` unified model interface).
+- [x] Implement `training/datasets/ingestion/` (`DatasetIngestor`, `DataRecord`).
+- [x] Implement `training/datasets/validation/` (`DataValidator`, `ValidationReport`).
+- [x] Implement `training/datasets/cleaning/` (`DataCleaner`, quality filtering, language heuristic).
+- [x] Implement `training/datasets/deduplication/` (`Deduplicator`, SHA-256 + 32-perm MinHash).
+- [x] Implement `training/datasets/governance/` (`DataGovernanceEngine`, license whitelist, PII redaction).
+- [x] Implement `training/datasets/splitting/` (`DatasetSplitter`, zero-leakage hash split).
+- [x] Implement `training/datasets/manifests/` (`DatasetManifest`, cryptographic verification).
+- [x] Implement `training/datasets/statistics/` (`DatasetStatistics`, Markdown tables).
+- [x] Implement developer CLI scripts in `scripts/`:
+  - [x] `scripts/train_tokenizer.py`
+  - [x] `scripts/encode_text.py`
+  - [x] `scripts/decode_tokens.py`
+  - [x] `scripts/inspect_dataset.py`
+- [x] Author technical documentation in `docs/`:
+  - [x] `docs/CUSTOM_BPE_TOKENIZER.md`
+  - [x] `docs/TOKENIZER_TRAINING.md`
+  - [x] `docs/MULTILINGUAL_TOKENIZATION.md`
+  - [x] `docs/DATA_PIPELINE.md`
+  - [x] `docs/DATA_GOVERNANCE.md`
+  - [x] `docs/DATASET_LICENSE_POLICY.md`
+- [x] Execute automated tests: **73 passed in 1.74s (100% success rate on CPU)**.
+- [ ] User review and authorization to commit Phase 04 changes.
 
 ---
 
 ## Phase Governance Rules
-1. Never skip phases or start Phase 04 automatically.
+1. Never skip phases or start Phase 05 automatically.
 2. Never silently alter finalized architecture decisions.
-3. Never use or download pretrained model weights; all parameters are initialized from random distributions.
+3. Never use or download pretrained model weights or pretrained tokenizer files.
 4. Keep all implementations within this single unified repository (`404-FOUNDERS`).
 5. Never force-push or commit credentials, private keys, or `.env` files.
