@@ -33,7 +33,107 @@ The system operates across two core modes:
 
 ---
 
-## 3. Core AI Foundation Architecture (Phase 03)
+## 3. Repository Structure
+
+```
+404-FOUNDERS/
+├── .env.example              # Environment variable configuration template
+├── .gitignore                # Security, Python, Node, weight, and OS exclusions
+├── pyproject.toml            # Python build specifications, dependencies, and tool settings
+├── README.md                 # Project architecture blueprint and quickstart
+├── PHASE_STATUS.md           # Phase governance matrix and gating criteria
+├── DEVELOPMENT_LOG.md        # Chronological engineering decision log
+├── CHANGELOG.md              # Versioned phase releases (Keep a Changelog)
+│
+├── core/                     # Foundational orchestration, reasoning & configuration
+│   ├── intelligence/         # High-level cognitive synthesis & NeuralCore
+│   ├── reasoning/            # Symbolic, math, and deductive reasoning
+│   ├── attention/            # Multi-mechanism attention primitives (Global, Sparse, Hierarchical, Fusion)
+│   ├── routing/              # Mixture-of-Experts and task routing (Rule-based, Learned, Dynamic)
+│   ├── context/              # Infinite-context state tracking
+│   └── orchestration/        # Lifecycle coordination and telemetry
+│
+├── neural_architecture/      # Custom neural topology & framework abstractions
+│   ├── interfaces.py         # Framework-agnostic backend engine contracts
+│   ├── inference.py          # Autoregressive generation & numerical validation harness
+│   ├── jax_interface.py      # Separated functional JAX model interfaces
+│   ├── layers/               # Custom layers (RMSNorm, RoPE, SwiGLU, Projections, Residuals)
+│   ├── modules/              # Hierarchical Transformer blocks & specialized experts
+│   ├── encoders/             # Modality-specific projection layers
+│   ├── decoders/             # Autoregressive generation heads
+│   ├── fusion/               # Cross-attention & multimodal gating
+│   └── research/             # Micro-prototypes and experimental modules
+│
+├── memory/                   # Multi-layer cognitive memory fabric
+│   ├── short_term/           # Working memory & attention KV-cache
+│   ├── long_term/            # Semantic vector persistence
+│   ├── knowledge/            # Structured factual knowledge graphs
+│   ├── episodic/             # Action logs and user interaction trajectories
+│   ├── retrieval/            # Hybrid sparse-dense (BM25 + ANN) search
+│   └── consolidation/        # Background distillation and salience decay
+│
+├── multimodal/               # Modality-specific ingestion pipelines
+│   ├── text/                 # Text & source code normalization
+│   ├── vision/               # High-resolution patch extraction
+│   ├── audio/                # Log-mel spectrogram feature extraction
+│   ├── video/                # Spatiotemporal 3D patch tubelets
+│   └── documents/            # Document layout & coordinate parsing
+│
+├── tokenizer/                # Custom BPE tokenizer engine
+│   ├── training/             # Pair frequency & merge rules training
+│   ├── vocabulary/           # Vocabulary mappings and special tokens
+│   └── evaluation/           # Compression ratio and fertility benchmarking
+│
+├── learning/                 # Training paradigms & objective functions
+│   ├── supervised/           # Next-token prediction & instruction tuning
+│   ├── self_supervised/      # Masked autoencoding & contrastive losses
+│   ├── reinforcement/        # DPO, PPO, and rule-based reward modeling
+│   ├── continual/            # Elastic weight consolidation & replay
+│   └── meta_learning/        # Fast adaptation & few-shot optimization
+│
+├── training/                 # Distributed training orchestration
+│   ├── datasets/             # Zero-copy memory-mapped shard readers
+│   ├── preprocessing/        # MinHash deduplication & PII masking
+│   ├── experiments/          # Metric tracking & manifests
+│   ├── checkpoints/          # Atomic checkpoint persistence
+│   └── evaluation/           # Benchmark suites & perplexity evaluation
+│
+├── personal_ai/              # Endpoint intelligence & desktop assistance
+│   ├── system_monitor/       # Read-only CPU, RAM, NVMe telemetry
+│   ├── coding_assistant/     # AST analysis, diff review, git automation
+│   ├── cybersecurity/        # Port auditing, socket check, anomaly detection
+│   ├── network_analysis/     # Latency, DNS, and interface diagnostics
+│   └── automation/           # Pre-approved task automation scripts
+│
+├── agent/                    # Autonomous planning & execution guardrails
+│   ├── planner/              # Hierarchical goal decomposition (ReAct)
+│   ├── tools/                # Permission-controlled tool registry
+│   ├── permissions/          # 4-tier security validation engine
+│   └── execution/            # Sandboxed subprocess runner
+│
+├── api/                      # Tri-protocol communication gateway
+│   ├── rest/                 # FastAPI REST controllers
+│   ├── websocket/            # Real-time token & event streaming
+│   └── grpc/                 # High-throughput binary RPC services
+│
+├── infrastructure/           # Multi-tier deployment definitions
+│   ├── local/                # Workstation constraints & memory budgeting
+│   ├── cloud/                # Object storage & hybrid API routing
+│   ├── gpu_cluster/          # Slurm job scripts & Megatron-LM configs
+│   └── deployment/           # Systemd user services & container manifests
+│
+├── database/                 # SQLite & DuckDB analytical storage
+├── security/                 # Zero-trust policy, audit logger & sanitization
+├── configs/                  # YAML system configurations & security policy
+├── frontend/                 # Client interfaces (React / Next.js / Tauri)
+├── scripts/                  # Developer utilities & automation
+├── tests/                    # Unit, integration, security & architecture tests
+└── docs/                     # Comprehensive technical architecture manuals
+```
+
+---
+
+## 4. Core AI Foundation Architecture (Phase 03)
 
 The central neural engine (`NeuralCore`) coordinates multi-stage hierarchical processing with full autograd gradient support:
 
@@ -75,7 +175,7 @@ flowchart TD
 
 ---
 
-## 4. Technical Documentation Index
+## 5. Technical Documentation Index
 
 Complete architectural specifications are maintained in [`docs/`](docs/):
 
@@ -97,13 +197,13 @@ Complete architectural specifications are maintained in [`docs/`](docs/):
 
 ---
 
-## 5. Development Roadmap & Phase Status
+## 6. Development Roadmap & Phase Status
 
 | Phase | Phase Name | Status |
 |---|---|---|
 | **Phase 01** | Environment & Hardware Assessment | **Completed** |
 | **Phase 02** | Project Architecture & Workspace Design | **Completed** |
-| **Phase 03** | **Core AI Foundation Development** | **Completed (Review Pending)** |
+| **Phase 03** | **Core AI Foundation Development** | **Completed (Audit & Review)** |
 | Phase 04 | Neural Architecture & Model Prototyping | Planned |
 | Phase 05 | Personal AI Assistant & Endpoint Core | Planned |
 | Phase 06 | Tri-Protocol API Services & Client Interface | Planned |
@@ -112,13 +212,17 @@ Complete architectural specifications are maintained in [`docs/`](docs/):
 
 ---
 
-## 6. Quickstart & Verification
+## 7. Quickstart & Verification
 
 ```bash
-# 1. Run complete automated test suite (44 tests) on CPU
+# 1. Review environment template and configuration
+cp .env.example .env
+.venv/bin/python -c "from core.config import SystemConfig; print(SystemConfig.from_env().to_dict())"
+
+# 2. Run complete automated test suite (44 tests) on CPU
 .venv/bin/python -m pytest tests/
 
-# 2. Execute prototype inference with greedy token prediction
+# 3. Execute prototype inference with greedy token prediction
 .venv/bin/python -c "
 from neural_architecture.inference import InferenceEngine
 engine = InferenceEngine()
