@@ -219,6 +219,72 @@ MIGRATIONS: List[Tuple[int, str, str]] = [
         CREATE INDEX IF NOT EXISTS idx_activity_user_cat ON activity_log_entries(user_id, category, created_at);
         """
     ),
+    (
+        3,
+        "Phase 13 Voice Biometrics, Profiles, Sessions & Proactive Settings Schema",
+        """
+        -- Registered voice biometric profiles (encrypted embedding storage)
+        CREATE TABLE IF NOT EXISTS voice_profiles (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            profile_name TEXT NOT NULL,
+            is_active INTEGER DEFAULT 1,
+            sample_count INTEGER DEFAULT 3,
+            f0_mean_hz REAL,
+            f0_std_hz REAL,
+            spectral_centroid_hz REAL,
+            encrypted_embedding_blob BLOB NOT NULL,
+            encryption_salt TEXT NOT NULL,
+            verification_threshold REAL DEFAULT 0.72,
+            anti_spoofing_enabled INTEGER DEFAULT 1,
+            enrolled_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES user_accounts(id) ON DELETE CASCADE
+        );
+
+        -- Active voice session state machine
+        CREATE TABLE IF NOT EXISTS voice_sessions (
+            session_id TEXT PRIMARY KEY,
+            user_id TEXT,
+            state TEXT DEFAULT 'STANDBY',
+            wake_word_detected TEXT,
+            verification_outcome TEXT,
+            confidence REAL,
+            liveness_score REAL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        -- Voice security and authentication audit ledger
+        CREATE TABLE IF NOT EXISTS voice_audit_log (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            event_type TEXT NOT NULL,
+            outcome TEXT NOT NULL,
+            details TEXT,
+            timestamp TEXT NOT NULL
+        );
+
+        -- Proactive assistance configuration
+        CREATE TABLE IF NOT EXISTS proactive_settings (
+            user_id TEXT PRIMARY KEY,
+            enabled INTEGER DEFAULT 1,
+            quiet_hours_enabled INTEGER DEFAULT 1,
+            quiet_hours_start TEXT DEFAULT '22:00',
+            quiet_hours_end TEXT DEFAULT '08:00',
+            ram_threshold_pct REAL DEFAULT 85.0,
+            cpu_threshold_pct REAL DEFAULT 80.0,
+            disk_threshold_gb REAL DEFAULT 10.0,
+            battery_low_threshold_pct REAL DEFAULT 20.0,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES user_accounts(id) ON DELETE CASCADE
+        );
+
+        -- Indexes for voice biometrics and audits
+        CREATE INDEX IF NOT EXISTS idx_voice_profiles_user ON voice_profiles(user_id, is_active);
+        CREATE INDEX IF NOT EXISTS idx_voice_audit_user ON voice_audit_log(user_id, timestamp);
+        """
+    ),
 ]
 
 

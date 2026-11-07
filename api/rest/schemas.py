@@ -1174,3 +1174,272 @@ class ChatStreamRequest(BaseModel):
     mode: str = "GENERAL"
 
 
+
+
+# -------------------------------------------------------------------------
+# Phase 13 — JARVIS Conversational Assistant Schemas
+# -------------------------------------------------------------------------
+
+class JarvisSessionRequest(BaseModel):
+    """Start or retrieve JARVIS voice session."""
+    model_config = ConfigDict(extra="ignore")
+    session_id: Optional[str] = None
+    user_id: Optional[str] = None
+    language_hint: Optional[str] = "en"
+    auto_speak: Optional[bool] = True
+
+
+class JarvisSessionResponse(BaseModel):
+    """Active JARVIS session response."""
+    model_config = ConfigDict(extra="ignore")
+    session_id: str
+    state: str
+    is_authenticated: bool = False
+    speaker_verified: bool = False
+    user_id: str
+    language_hint: Optional[str] = "en"
+    created_at: Optional[str] = None
+    timestamp: Optional[str] = None
+
+
+class WakeWordCheckRequest(BaseModel):
+    """Wake-word detection payload."""
+    model_config = ConfigDict(extra="ignore")
+    transcript: Optional[str] = None
+    text_hint: Optional[str] = None
+    audio_base64: Optional[str] = None
+    sample_rate: Optional[int] = 16000
+
+
+class WakeWordCheckResponse(BaseModel):
+    """Wake-word detection outcome."""
+    model_config = ConfigDict(extra="ignore")
+    detected: bool
+    wake_word: Optional[str] = None
+    phrase: Optional[str] = None
+    confidence: float
+    energy: Optional[float] = 0.0
+    latency_ms: Optional[float] = 0.0
+    timestamp: Optional[str] = None
+
+
+class VoiceEnrollSampleRequest(BaseModel):
+    """Submit individual voice sample for quality check."""
+    model_config = ConfigDict(extra="ignore")
+    sample_index: int
+    audio_base64: str
+    user_id: Optional[str] = None
+    sample_rate: Optional[int] = 16000
+
+
+class VoiceEnrollSampleResponse(BaseModel):
+    """Enrollment sample quality analysis."""
+    model_config = ConfigDict(extra="ignore")
+    sample_index: int
+    user_id: Optional[str] = None
+    is_acceptable: bool = True
+    is_valid: bool = True
+    snr_db: float
+    duration_seconds: float
+    is_clipped: bool = False
+    is_silent: bool = False
+    quality_message: Optional[str] = None
+    rejection_reason: Optional[str] = None
+    samples_recorded: Optional[int] = 0
+    samples_needed: Optional[int] = 0
+
+
+class VoiceEnrollFinalizeRequest(BaseModel):
+    """Finalize voice profile enrollment with 3+ verified samples."""
+    model_config = ConfigDict(extra="ignore")
+    profile_name: Optional[str] = "Primary Voice"
+    user_id: Optional[str] = None
+    samples_base64: Optional[List[str]] = None
+    verification_threshold: Optional[float] = 0.75
+    anti_spoofing: Optional[bool] = True
+
+
+class VoiceEnrollFinalizeResponse(BaseModel):
+    """Voice profile enrollment confirmation."""
+    model_config = ConfigDict(extra="ignore")
+    profile_id: str
+    user_id: Optional[str] = None
+    profile_name: str
+    sample_count: int
+    status: Optional[str] = "ACTIVE"
+    f0_mean_hz: Optional[float] = 0.0
+    verification_threshold: float
+    anti_spoofing_enabled: Optional[bool] = True
+    enrolled_at: str
+
+
+class VoiceProfileResponse(BaseModel):
+    """Registered voice profile representation."""
+    model_config = ConfigDict(extra="ignore")
+    has_profile: bool = False
+    exists: bool = False
+    is_active: bool = False
+    profile_id: Optional[str] = None
+    user_id: Optional[str] = None
+    profile_name: Optional[str] = None
+    sample_count: Optional[int] = 0
+    verification_threshold: Optional[float] = 0.75
+    anti_spoofing_enabled: Optional[bool] = True
+    enrolled_at: Optional[str] = None
+    profile: Optional[Dict[str, Any]] = None
+
+
+class VoiceVerifyRequest(BaseModel):
+    """Speaker verification request."""
+    model_config = ConfigDict(extra="ignore")
+    audio_base64: str
+    user_id: Optional[str] = None
+    sample_rate: Optional[int] = 16000
+
+
+class VoiceVerifyResponse(BaseModel):
+    """Speaker verification outcome."""
+    model_config = ConfigDict(extra="ignore")
+    outcome: str
+    similarity_score: float
+    confidence: float
+    liveness_score: float = 0.0
+    is_live: bool = True
+    is_spoof: bool = False
+    message: Optional[str] = None
+    reason: Optional[str] = None
+    evaluation_notice: Optional[str] = None
+
+
+class JarvisTranscribeRequest(BaseModel):
+    """Speech transcription request."""
+    model_config = ConfigDict(extra="ignore")
+    audio_base64: str
+    sample_rate: Optional[int] = 16000
+    language_hint: Optional[str] = None
+    context_hint: Optional[str] = None
+
+
+class JarvisTranscribeResponse(BaseModel):
+    """Speech transcription result."""
+    model_config = ConfigDict(extra="ignore")
+    text: str
+    detected_language: str
+    confidence: float
+    duration_seconds: float
+
+
+class JarvisSynthesizeRequest(BaseModel):
+    """Speech synthesis request."""
+    model_config = ConfigDict(extra="ignore")
+    text: str
+    voice_id: Optional[str] = "founders_calm"
+    speed: Optional[float] = 1.0
+    speed_factor: Optional[float] = 1.0
+    pitch: Optional[float] = 1.0
+    pitch_hz: Optional[float] = None
+    language: Optional[str] = None
+
+
+class JarvisSynthesizeResponse(BaseModel):
+    """Speech synthesis result."""
+    model_config = ConfigDict(extra="ignore")
+    audio_base64: str = ""
+    audio_format: str = "audio/wav"
+    duration_seconds: float
+    voice_id: str
+    audio_base64_uri: Optional[str] = None
+    text: Optional[str] = None
+    language: Optional[str] = None
+
+
+class JarvisInteractRequest(BaseModel):
+    """End-to-end JARVIS conversational turn payload."""
+    model_config = ConfigDict(extra="ignore")
+    user_id: Optional[str] = None
+    query: Optional[str] = None
+    text_input: Optional[str] = None
+    audio_base64: Optional[str] = None
+    session_id: Optional[str] = None
+    transcript_hint: Optional[str] = None
+    ticket_id: Optional[str] = None
+    skip_wake_word: Optional[bool] = True
+
+
+class JarvisInteractResponse(BaseModel):
+    """End-to-end JARVIS conversational turn response."""
+    model_config = ConfigDict(extra="ignore")
+    session_id: str
+    state: str
+    user_id: Optional[str] = None
+    is_authenticated: bool = False
+    user_query: Optional[str] = None
+    user_transcript: Optional[str] = None
+    detected_language: str = "en"
+    assistant_response: Optional[str] = None
+    assistant_reply: Optional[str] = None
+    tool_called: Optional[str] = None
+    tool_status: Optional[str] = None
+    tool_result: Optional[Dict[str, Any]] = None
+    tool_execution: Optional[Dict[str, Any]] = None
+    audio_base64: Optional[str] = None
+    audio_format: Optional[str] = None
+    audio: Optional[Dict[str, Any]] = None
+    requires_ticket: bool = False
+    required_permission: Optional[str] = None
+    ticket_request_id: Optional[str] = None
+    latency_ms: float = 0.0
+    timestamp: Optional[str] = None
+
+
+class JarvisInterruptRequest(BaseModel):
+    """Barge-in interrupt request."""
+    model_config = ConfigDict(extra="ignore")
+    session_id: str
+    reason: Optional[str] = "barge_in"
+
+
+class JarvisInterruptResponse(BaseModel):
+    """Barge-in interrupt response."""
+    model_config = ConfigDict(extra="ignore")
+    session_id: str
+    state: str
+    interrupted: bool
+    timestamp: Optional[str] = None
+
+
+class ProactiveAlertSchema(BaseModel):
+    """Individual proactive alert entry."""
+    model_config = ConfigDict(extra="ignore")
+    alert_id: str
+    category: str
+    severity: str
+    title: str
+    message: str
+    timestamp: str
+    suggested_action: Optional[str] = None
+    metric_value: Optional[float] = None
+    threshold_value: Optional[float] = None
+    spoken_announcement: Optional[str] = None
+
+
+class ProactiveAlertsResponse(BaseModel):
+    """Active proactive alerts response."""
+    model_config = ConfigDict(extra="ignore")
+    total_count: int = 0
+    total: int = 0
+    alerts: List[ProactiveAlertSchema]
+    quiet_hours_active: bool = False
+
+
+class ProactiveConfigUpdateRequest(BaseModel):
+    """Update proactive assistance configuration."""
+    model_config = ConfigDict(extra="ignore")
+    enabled: Optional[bool] = None
+    quiet_hours_enabled: Optional[bool] = None
+    quiet_hours_start: Optional[str] = None
+    quiet_hours_end: Optional[str] = None
+    ram_threshold_pct: Optional[float] = None
+    cpu_threshold_pct: Optional[float] = None
+    disk_threshold_gb: Optional[float] = None
+    battery_threshold_pct: Optional[float] = None

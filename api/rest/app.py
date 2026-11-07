@@ -42,6 +42,7 @@ from personal_ai.memory_bridge import PersonalAIMemoryBridge
 from security.auth import AuthManager
 from tokenizer import CustomBPETokenizer
 from api.websocket.handler import handle_websocket_session
+from api.websocket.jarvis_handler import handle_jarvis_websocket_session
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -108,6 +109,13 @@ def initialize_runtime_services() -> Dict[str, Any]:
     settings_mgr = UserSettingsManager(db_mgr)
     activity_mgr = ActivityLogManager(db_mgr)
 
+    # Phase 13 — JARVIS Conversational Assistant
+    from jarvis.service import JarvisService
+    jarvis_svc = JarvisService.get_instance(
+        db_manager=db_mgr,
+        personal_ai_controller=personal_ai_ctrl,
+    )
+
     return {
         "tokenizer": tokenizer,
         "neural_model": neural_model,
@@ -132,6 +140,7 @@ def initialize_runtime_services() -> Dict[str, Any]:
         "settings_manager": settings_mgr,
         "activity_manager": activity_mgr,
         "personal_ai_controller": personal_ai_ctrl,
+        "jarvis_service": jarvis_svc,
         "agent_runtime": personal_ai_ctrl.runtime,
         "approval_manager": personal_ai_ctrl.approval_mgr,
         "emergency_controller": personal_ai_ctrl.emergency_ctrl,
@@ -196,6 +205,12 @@ def create_app(
         if not hasattr(app.state, "services") or not app.state.services:
             app.state.services = initialize_runtime_services()
         await handle_websocket_session(websocket, app.state.services)
+
+    @app.websocket("/ws/v1/jarvis")
+    async def websocket_jarvis_endpoint(websocket: WebSocket) -> None:
+        if not hasattr(app.state, "services") or not app.state.services:
+            app.state.services = initialize_runtime_services()
+        await handle_jarvis_websocket_session(websocket, app.state.services)
 
     # Mount API routers
     app.include_router(router)

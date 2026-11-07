@@ -89,7 +89,7 @@ class NaturalLanguageToolRouter:
             # Extract application name candidate
             app_match = re.search(r"(?:open|launch|start|kholo|chalao)\s+([a-zA-Z0-9_\-\s]+)", q)
             app_name = app_match.group(1).strip() if app_match else "application"
-            app_name = app_name.replace("karo", "").strip()
+            app_name = re.sub(r"\b(?:app|application|karo)\b", "", app_name).strip() or "app"
 
             return RoutedIntentResult(
                 intent=PersonalAIIntent.LAUNCH_APPLICATION,

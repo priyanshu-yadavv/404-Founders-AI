@@ -7,6 +7,7 @@ and security validation.
 from __future__ import annotations
 
 from dataclasses import asdict
+from datetime import datetime, timezone
 import json
 import subprocess
 import time
@@ -138,6 +139,29 @@ from api.rest.schemas import (
     UserSessionItemSchema,
     UserSettingsSchema,
     UserSettingsUpdateRequest,
+    # Phase 13 JARVIS Schemas
+    JarvisSessionRequest,
+    JarvisSessionResponse,
+    WakeWordCheckRequest,
+    WakeWordCheckResponse,
+    VoiceEnrollSampleRequest,
+    VoiceEnrollSampleResponse,
+    VoiceEnrollFinalizeRequest,
+    VoiceEnrollFinalizeResponse,
+    VoiceProfileResponse,
+    VoiceVerifyRequest,
+    VoiceVerifyResponse,
+    JarvisTranscribeRequest,
+    JarvisTranscribeResponse,
+    JarvisSynthesizeRequest,
+    JarvisSynthesizeResponse,
+    JarvisInteractRequest,
+    JarvisInteractResponse,
+    JarvisInterruptRequest,
+    JarvisInterruptResponse,
+    ProactiveAlertSchema,
+    ProactiveAlertsResponse,
+    ProactiveConfigUpdateRequest,
 )
 from core.conversation_manager import (
     ActivityLogManager,
@@ -2647,6 +2671,18 @@ def _get_activity_mgr(services: Dict[str, Any]) -> ActivityLogManager:
     return mgr
 
 
+def _get_jarvis_service(services: Dict[str, Any]):
+    svc = services.get("jarvis_service")
+    if svc is None:
+        from jarvis.service import JarvisService
+        svc = JarvisService.get_instance(
+            db_manager=services.get("db_manager"),
+            personal_ai_controller=services.get("personal_ai_controller"),
+        )
+        services["jarvis_service"] = svc
+    return svc
+
+
 def _get_current_user(
     request: Request,
     authorization: Optional[str] = Header(None),
@@ -3293,5 +3329,467 @@ async def get_activity_history(
             for e in entries
         ],
     )
+
+
+# -----------------------------------------------------------------------------
+# 6. Phase 13 — JARVIS-Style Conversational Assistant Endpoints
+# -----------------------------------------------------------------------------
+
+@router.post(
+    "/api/v1/jarvis/session",
+    response_model=JarvisSessionResponse,
+    tags=["JARVIS Assistant"],
+    summary="Create or retrieve active conversational voice session",
+)
+async def create_jarvis_session(
+    payload: JarvisSessionRequest,
+    current_user: UserAccount = Depends(_get_current_user),
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> JarvisSessionResponse:
+    jarvis_svc = _get_jarvis_service(services)
+    user_id = payload.user_id or current_user.id
+    session = jarvis_svc.conversation_engine.create_session(
+        user_id=user_id,
+        language_hint=payload.language_hint,
+    )
+    return JarvisSessionResponse(
+        session_id=session.session_id,
+        user_id=session.user_id,
+        state=session.state.value,
+        language_hint=payload.language_hint,
+        speaker_verified=session.speaker_verified,
+        created_at=session.created_at,
+    )
+
+
+@router.post(
+    "/api/v1/jarvis/wake-word",
+    response_model=WakeWordCheckResponse,
+    tags=["JARVIS Assistant"],
+    summary="Evaluate audio or text hint for wake-word activation",
+)
+async def check_wake_word(
+    payload: WakeWordCheckRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> WakeWordCheckResponse:
+    jarvis_svc = _get_jarvis_service(services)
+    audio_bytes = base64.b64decode(payload.audio_base64) if payload.audio_base64 else None
+    result = jarvis_svc.wake_detector.detect(
+        audio_bytes=audio_bytes,
+        sample_rate=payload.sample_rate,
+        transcript_hint=payload.text_hint,
+    )
+    return WakeWordCheckResponse(
+        detected=result.detected,
+        phrase=result.matched_phrase,
+        confidence=result.confidence,
+        energy=result.energy,
+        latency_ms=result.detection_latency_ms,
+    )
+
+
+@router.post(
+    "/api/v1/jarvis/enroll/sample",
+    response_model=VoiceEnrollSampleResponse,
+    tags=["JARVIS Assistant"],
+    summary="Submit and validate an acoustic voice sample for enrollment",
+)
+async def enroll_voice_sample(
+    payload: VoiceEnrollSampleRequest,
+    current_user: UserAccount = Depends(_get_current_user),
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> VoiceEnrollSampleResponse:
+    jarvis_svc = _get_jarvis_service(services)
+    user_id = payload.user_id or current_user.id
+    try:
+        audio_bytes = base64.b64decode(payload.audio_base64)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid base64 audio payload",
+        )
+    quality = jarvis_svc.add_enrollment_sample(user_id=user_id, audio_bytes=audio_bytes)
+    buffered_count = jarvis_svc.get_enrollment_sample_count(user_id)
+    needed = max(0, 3 - buffered_count)
+
+    return VoiceEnrollSampleResponse(
+        user_id=user_id,
+        sample_index=payload.sample_index,
+        snr_db=quality.snr_db,
+        duration_seconds=quality.duration_seconds,
+        is_clipped=quality.is_clipped,
+        is_valid=quality.is_acceptable,
+        quality_message=quality.rejection_reason or "Sample quality acceptable",
+        samples_recorded=buffered_count,
+        samples_needed=needed,
+    )
+
+
+@router.post(
+    "/api/v1/jarvis/enroll/finalize",
+    response_model=VoiceEnrollFinalizeResponse,
+    tags=["JARVIS Assistant"],
+    summary="Finalize biometric enrollment and generate encrypted voice profile",
+)
+async def finalize_voice_enrollment(
+    payload: VoiceEnrollFinalizeRequest,
+    current_user: UserAccount = Depends(_get_current_user),
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> VoiceEnrollFinalizeResponse:
+    jarvis_svc = _get_jarvis_service(services)
+    user_id = payload.user_id or current_user.id
+    try:
+        profile = jarvis_svc.finalize_enrollment(
+            user_id=user_id,
+            profile_name=payload.profile_name or "Primary Voice",
+            verification_threshold=payload.verification_threshold,
+            anti_spoofing=payload.anti_spoofing,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
+
+    return VoiceEnrollFinalizeResponse(
+        status="ACTIVE",
+        profile_id=profile.profile_id,
+        user_id=profile.user_id,
+        profile_name=profile.profile_name,
+        sample_count=profile.sample_count,
+        verification_threshold=profile.verification_threshold,
+        anti_spoofing_enabled=profile.anti_spoofing_enabled,
+        enrolled_at=profile.enrolled_at,
+    )
+
+
+@router.get(
+    "/api/v1/jarvis/profile",
+    response_model=VoiceProfileResponse,
+    tags=["JARVIS Assistant"],
+    summary="Get voice biometric enrollment status and profile metadata",
+)
+async def get_voice_profile(
+    user_id: Optional[str] = Query(None),
+    current_user: UserAccount = Depends(_get_current_user),
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> VoiceProfileResponse:
+    jarvis_svc = _get_jarvis_service(services)
+    target_user = user_id or current_user.id
+    profile = jarvis_svc.get_voice_profile(target_user)
+    if profile is None:
+        return VoiceProfileResponse(exists=False, user_id=target_user)
+    return VoiceProfileResponse(
+        exists=True,
+        profile_id=profile.profile_id,
+        user_id=profile.user_id,
+        profile_name=profile.profile_name,
+        sample_count=profile.sample_count,
+        verification_threshold=profile.verification_threshold,
+        anti_spoofing_enabled=profile.anti_spoofing_enabled,
+        enrolled_at=profile.enrolled_at,
+        is_active=profile.is_active,
+    )
+
+
+@router.delete(
+    "/api/v1/jarvis/profile",
+    tags=["JARVIS Assistant"],
+    summary="Permanently revoke user voice biometric profile",
+)
+async def delete_voice_profile(
+    user_id: Optional[str] = Query(None),
+    current_user: UserAccount = Depends(_get_current_user),
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> Dict[str, Any]:
+    jarvis_svc = _get_jarvis_service(services)
+    target_user = user_id or current_user.id
+    revoked = jarvis_svc.revoke_voice_profile(target_user)
+    return {
+        "status": "REVOKED" if revoked else "NOT_FOUND",
+        "user_id": target_user,
+        "message": "Voice biometric profile successfully deactivated and purged from cache",
+    }
+
+
+@router.post(
+    "/api/v1/jarvis/verify",
+    response_model=VoiceVerifyResponse,
+    tags=["JARVIS Assistant"],
+    summary="Verify speaker identity against enrolled biometric profile",
+)
+async def verify_speaker(
+    payload: VoiceVerifyRequest,
+    current_user: UserAccount = Depends(_get_current_user),
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> VoiceVerifyResponse:
+    jarvis_svc = _get_jarvis_service(services)
+    user_id = payload.user_id or current_user.id
+    try:
+        audio_bytes = base64.b64decode(payload.audio_base64)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid base64 audio payload",
+        )
+    verdict = jarvis_svc.verify_speaker_voice(
+        user_id=user_id,
+        audio_bytes=audio_bytes,
+        sample_rate=payload.sample_rate,
+    )
+    return VoiceVerifyResponse(
+        outcome=verdict.outcome.value,
+        similarity_score=verdict.similarity_score,
+        liveness_score=verdict.liveness_score,
+        is_live=verdict.is_live,
+        confidence=verdict.confidence,
+        message=verdict.message,
+    )
+
+
+@router.post(
+    "/api/v1/jarvis/transcribe",
+    response_model=JarvisTranscribeResponse,
+    tags=["JARVIS Assistant"],
+    summary="Transcribe audio speech into text with language identification",
+)
+async def transcribe_speech(
+    payload: JarvisTranscribeRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> JarvisTranscribeResponse:
+    jarvis_svc = _get_jarvis_service(services)
+    try:
+        audio_bytes = base64.b64decode(payload.audio_base64)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid base64 audio payload",
+        )
+    result = jarvis_svc.stt.transcribe(
+        audio_bytes=audio_bytes,
+        sample_rate=payload.sample_rate,
+        language_hint=payload.language_hint,
+    )
+    return JarvisTranscribeResponse(
+        text=result.text,
+        detected_language=result.detected_language,
+        confidence=result.confidence,
+        duration_seconds=result.duration_seconds,
+    )
+
+
+@router.post(
+    "/api/v1/jarvis/synthesize",
+    response_model=JarvisSynthesizeResponse,
+    tags=["JARVIS Assistant"],
+    summary="Synthesize speech with the 404 FOUNDERS voice identity",
+)
+async def synthesize_speech(
+    payload: JarvisSynthesizeRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> JarvisSynthesizeResponse:
+    jarvis_svc = _get_jarvis_service(services)
+    output = jarvis_svc.tts.synthesize(
+        text=payload.text,
+        voice_id=payload.voice_id,
+        speed=payload.speed,
+        pitch=payload.pitch,
+    )
+    return JarvisSynthesizeResponse(
+        audio_base64=output.audio_base64,
+        audio_format=output.audio_format,
+        duration_seconds=output.duration_seconds,
+        voice_id=output.voice_id,
+    )
+
+
+@router.post(
+    "/api/v1/jarvis/interact",
+    response_model=JarvisInteractResponse,
+    tags=["JARVIS Assistant"],
+    summary="Main conversational interaction turn supporting voice or text",
+)
+async def interact_with_jarvis(
+    payload: JarvisInteractRequest,
+    current_user: UserAccount = Depends(_get_current_user),
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> JarvisInteractResponse:
+    t0 = time.time()
+    jarvis_svc = _get_jarvis_service(services)
+    user_id = payload.user_id or current_user.id
+    session_id = payload.session_id
+
+    if payload.audio_base64:
+        try:
+            audio_bytes = base64.b64decode(payload.audio_base64)
+        except Exception:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid base64 audio payload",
+            )
+        turn_res = jarvis_svc.process_voice_turn(
+            user_id=user_id,
+            audio_bytes=audio_bytes,
+            session_id=session_id,
+            transcript_hint=payload.text_input,
+            skip_wake_word_check=payload.skip_wake_word,
+        )
+    elif payload.text_input:
+        turn_res = jarvis_svc.process_text_turn(
+            user_id=user_id,
+            query=payload.text_input,
+            session_id=session_id,
+        )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Either text_input or audio_base64 must be provided",
+        )
+
+    latency_ms = round((time.time() - t0) * 1000, 2)
+    return JarvisInteractResponse(
+        session_id=turn_res.get("session_id", session_id or "default"),
+        user_id=user_id,
+        state=turn_res.get("state", "STANDBY"),
+        user_transcript=turn_res.get("transcript", payload.text_input or ""),
+        assistant_reply=turn_res.get("assistant_reply", ""),
+        detected_language=turn_res.get("language", "en"),
+        tool_called=turn_res.get("tool_called"),
+        tool_status=turn_res.get("tool_status"),
+        tool_result=turn_res.get("tool_result"),
+        audio_base64=turn_res.get("audio_base64"),
+        audio_format="audio/wav" if turn_res.get("audio_base64") else None,
+        requires_ticket=turn_res.get("requires_ticket", False),
+        required_permission=turn_res.get("required_permission"),
+        ticket_request_id=turn_res.get("ticket_request_id"),
+        latency_ms=latency_ms,
+    )
+
+
+@router.post(
+    "/api/v1/jarvis/interrupt",
+    response_model=JarvisInterruptResponse,
+    tags=["JARVIS Assistant"],
+    summary="Trigger barge-in interrupt to stop current assistant speech",
+)
+async def interrupt_jarvis(
+    payload: JarvisInterruptRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> JarvisInterruptResponse:
+    jarvis_svc = _get_jarvis_service(services)
+    state = jarvis_svc.interrupt(payload.session_id)
+    return JarvisInterruptResponse(
+        session_id=payload.session_id,
+        state=state.value,
+        interrupted=True,
+        timestamp=datetime.now(timezone.utc).isoformat(),
+    )
+
+
+@router.get(
+    "/api/v1/jarvis/state",
+    tags=["JARVIS Assistant"],
+    summary="Get current JARVIS assistant state",
+)
+async def get_jarvis_state(
+    session_id: Optional[str] = None,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> Dict[str, Any]:
+    jarvis_svc = _get_jarvis_service(services)
+    sid = session_id or "default"
+    session = jarvis_svc.conversation_engine.get_session(sid)
+    st = session.state.value if session else JarvisState.STANDBY.value
+    return {
+        "session_id": sid,
+        "state": st,
+        "speaker_verified": session.speaker_verified if session else False,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.get(
+    "/api/v1/jarvis/proactive/alerts",
+    response_model=ProactiveAlertsResponse,
+    tags=["JARVIS Assistant"],
+    summary="Retrieve current proactive hardware vitals alerts",
+)
+async def get_proactive_alerts(
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> ProactiveAlertsResponse:
+    jarvis_svc = _get_jarvis_service(services)
+    alerts = jarvis_svc.get_proactive_alerts()
+    is_quiet = jarvis_svc.proactive_engine.is_quiet_hours()
+    return ProactiveAlertsResponse(
+        alerts=[
+            ProactiveAlertSchema(
+                alert_id=a.alert_id,
+                category=a.category,
+                severity=a.severity,
+                title=a.title,
+                message=a.message,
+                metric_value=a.metric_value,
+                threshold_value=a.threshold_value,
+                spoken_announcement=a.spoken_announcement,
+                timestamp=a.timestamp,
+            )
+            for a in alerts
+        ],
+        total=len(alerts),
+        quiet_hours_active=is_quiet,
+    )
+
+
+@router.post(
+    "/api/v1/jarvis/proactive/config",
+    tags=["JARVIS Assistant"],
+    summary="Update proactive system monitoring thresholds and quiet hours",
+)
+async def update_proactive_config(
+    payload: ProactiveConfigUpdateRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> Dict[str, Any]:
+    jarvis_svc = _get_jarvis_service(services)
+    cfg = jarvis_svc.proactive_engine.config
+    if payload.enabled is not None:
+        cfg.enabled = payload.enabled
+    if payload.quiet_hours_start is not None:
+        cfg.quiet_hours_start = payload.quiet_hours_start
+    if payload.quiet_hours_end is not None:
+        cfg.quiet_hours_end = payload.quiet_hours_end
+    if payload.cpu_threshold_pct is not None:
+        cfg.cpu_threshold_pct = payload.cpu_threshold_pct
+    if payload.ram_threshold_pct is not None:
+        cfg.ram_threshold_pct = payload.ram_threshold_pct
+    if payload.disk_threshold_gb is not None:
+        cfg.disk_threshold_gb = payload.disk_threshold_gb
+    if payload.battery_threshold_pct is not None:
+        cfg.battery_threshold_pct = payload.battery_threshold_pct
+
+    return {
+        "status": "UPDATED",
+        "config": {
+            "enabled": cfg.enabled,
+            "quiet_hours_start": cfg.quiet_hours_start,
+            "quiet_hours_end": cfg.quiet_hours_end,
+            "cpu_threshold_pct": cfg.cpu_threshold_pct,
+            "ram_threshold_pct": cfg.ram_threshold_pct,
+            "disk_threshold_gb": cfg.disk_threshold_gb,
+            "battery_threshold_pct": cfg.battery_threshold_pct,
+        },
+    }
+
+
+@router.post(
+    "/api/v1/jarvis/proactive/dismiss",
+    tags=["JARVIS Assistant"],
+    summary="Dismiss or acknowledge a proactive alert",
+)
+async def dismiss_proactive_alert(
+    alert_id: str = Query(...),
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> Dict[str, Any]:
+    jarvis_svc = _get_jarvis_service(services)
+    jarvis_svc.proactive_engine.dismiss_alert(alert_id)
+    return {"status": "DISMISSED", "alert_id": alert_id}
+
 
 

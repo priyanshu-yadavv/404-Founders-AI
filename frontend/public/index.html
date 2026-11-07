@@ -40,6 +40,10 @@
 
           <div class="nav-group-label" style="margin-top: 10px;">Operating Workspaces</div>
           <ul class="nav-list">
+            <li class="nav-item" data-view="jarvis">
+              <svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line><line x1="8" y1="22" x2="16" y2="22"></line></svg>
+              <span>JARVIS Voice</span>
+            </li>
             <li class="nav-item" data-view="personal-ai">
               <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
               <span>Personal AI Agent</span>
@@ -1423,8 +1427,255 @@ Awaiting trigger for next offline continual learning cycle.
           </div>
         </section>
 
+        <!-- View 11: JARVIS Conversational Voice Assistant (Phase 13) -->
+        <section id="view-jarvis" class="view-panel">
+          <!-- Voice Assistant Hero Stage -->
+          <div class="jarvis-hero-card">
+            <!-- Status Indicators Row -->
+            <div class="jarvis-badge-row">
+              <div class="jarvis-badge" id="jarvisStateBadge">
+                <span class="jarvis-pulse-dot pulse" id="jarvisStateDot"></span>
+                <span id="jarvisStateText">STANDBY</span>
+              </div>
+              <div class="jarvis-badge" id="jarvisSpeakerBadge">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>
+                <span id="jarvisSpeakerText">Only My Voice: Checking...</span>
+              </div>
+              <div class="jarvis-badge" id="jarvisQuietBadge">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+                <span id="jarvisQuietText">Active Monitoring</span>
+              </div>
+            </div>
+
+            <!-- Waveform Visualizer -->
+            <div class="jarvis-waveform-wrap">
+              <canvas id="jarvisWaveformCanvas" width="600" height="70"></canvas>
+            </div>
+
+            <!-- Central Microphone Button -->
+            <button id="btnJarvisMic" class="jarvis-mic-btn" title="Click to speak (or say 'Hey Founders')">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                <line x1="12" y1="19" x2="12" y2="22"/>
+                <line x1="8" y1="22" x2="16" y2="22"/>
+              </svg>
+            </button>
+            <div id="jarvisMicLabel" style="font-size: 13px; font-weight: 500; color: var(--text-primary); margin-bottom: 8px;">
+              Tap to Speak / Press Space
+            </div>
+
+            <!-- Hero Controls Bar -->
+            <div class="jarvis-controls-bar">
+              <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer;">
+                <input type="checkbox" id="chkJarvisWakeWord" checked />
+                <span>Wake Word: <strong>Hey Founders</strong></span>
+              </label>
+              <button id="btnJarvisInterrupt" class="btn-secondary btn-sm" style="padding: 4px 10px; font-size: 11px;">
+                🛑 Barge-In (Stop)
+              </button>
+              <span class="jarvis-badge" id="jarvisLangTag" style="font-size: 11px;">
+                🌐 English &bull; Hindi &bull; Hinglish
+              </span>
+            </div>
+            <audio id="jarvisAudioPlayer" style="display: none;"></audio>
+          </div>
+
+          <!-- Two-Column Workspace Layout -->
+          <div style="display: grid; grid-template-columns: 1fr 1.35fr; gap: 20px;">
+
+            <!-- Left Column: Voice Synthesis, Biometrics, Proactive Guardian -->
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+
+              <!-- Voice Synthesis Settings -->
+              <div class="card">
+                <div class="card-header">
+                  <div>
+                    <h4>Voice Identity & Synthesis</h4>
+                    <span class="card-tag">Neural Speech Generation</span>
+                  </div>
+                </div>
+                <div class="card-body">
+                  <div style="margin-bottom: 12px;">
+                    <label class="form-label">Voice Identity</label>
+                    <select id="selJarvisVoice" class="form-select" style="width: 100%; padding: 8px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
+                      <option value="founders_calm">404 Founders Calm (Standard English)</option>
+                      <option value="founders_hindi">404 Founders Hindi (Devanagari / Hinglish)</option>
+                      <option value="founders_fast">404 Founders Fast (Technical & Code Analysis)</option>
+                    </select>
+                  </div>
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px;">
+                    <div>
+                      <label class="form-label" style="font-size: 11px;">Speed: <span id="valJarvisSpeed">1.0x</span></label>
+                      <input type="range" id="rangeJarvisSpeed" min="0.75" max="1.4" step="0.05" value="1.0" style="width: 100%;" />
+                    </div>
+                    <div>
+                      <label class="form-label" style="font-size: 11px;">Pitch: <span id="valJarvisPitch">1.0x</span></label>
+                      <input type="range" id="rangeJarvisPitch" min="0.8" max="1.2" step="0.05" value="1.0" style="width: 100%;" />
+                    </div>
+                  </div>
+                  <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; margin-top: 6px;">
+                    <input type="checkbox" id="chkJarvisAutoplay" checked />
+                    <span>Autoplay spoken voice responses</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Voice Biometrics ("Only My Voice") Security -->
+              <div class="card">
+                <div class="card-header">
+                  <div>
+                    <h4>Voice Biometrics ("Only My Voice")</h4>
+                    <span class="card-tag">AES-256-GCM Encrypted Embeddings</span>
+                  </div>
+                </div>
+                <div class="card-body">
+                  <p style="font-size: 12px; color: var(--text-secondary); margin: 0 0 12px 0;">
+                    Raw audio is never stored. Your speaker profile is computed as a 32-dimensional spectral vector and encrypted locally.
+                  </p>
+                  <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--surface-secondary); border-radius: var(--radius-sm); margin-bottom: 12px;">
+                    <span style="font-size: 12px; font-weight: 500;">Enrolled Status:</span>
+                    <span id="jarvisProfileStatusText" style="font-size: 12px; font-weight: 600; color: var(--accent-primary);">Checking...</span>
+                  </div>
+                  <div style="margin-bottom: 12px;">
+                    <label class="form-label" style="font-size: 11px;">Verification Threshold: <span id="valJarvisThreshold">0.75</span></label>
+                    <input type="range" id="rangeJarvisThreshold" min="0.60" max="0.90" step="0.01" value="0.75" style="width: 100%;" />
+                  </div>
+                  <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; margin-bottom: 14px;">
+                    <input type="checkbox" id="chkJarvisAntiSpoof" checked />
+                    <span>Enable Acoustic Anti-Spoofing & Liveness Guard</span>
+                  </label>
+                  <div style="display: flex; gap: 8px;">
+                    <button id="btnOpenEnrollModal" class="btn-primary btn-sm" style="flex: 1;">
+                      Enroll Speaker Voice
+                    </button>
+                    <button id="btnRevokeVoiceProfile" class="btn-secondary btn-sm" style="color: #9E3A3A; border-color: #9E3A3A;">
+                      Revoke Profile
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Proactive Health Guardian Card -->
+              <div class="card">
+                <div class="card-header">
+                  <div>
+                    <h4>Proactive Hardware Guardian</h4>
+                    <span class="card-tag">Autonomous Vitals Watchdog</span>
+                  </div>
+                </div>
+                <div class="card-body">
+                  <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; text-align: center;">
+                    <div style="padding: 8px; background: var(--surface-secondary); border-radius: var(--radius-xs);">
+                      <div style="font-size: 10px; color: var(--text-secondary);">CPU</div>
+                      <div id="jarvisCpuMeter" style="font-size: 13px; font-weight: 600;">--%</div>
+                    </div>
+                    <div style="padding: 8px; background: var(--surface-secondary); border-radius: var(--radius-xs);">
+                      <div style="font-size: 10px; color: var(--text-secondary);">RAM</div>
+                      <div id="jarvisRamMeter" style="font-size: 13px; font-weight: 600;">--%</div>
+                    </div>
+                    <div style="padding: 8px; background: var(--surface-secondary); border-radius: var(--radius-xs);">
+                      <div style="font-size: 10px; color: var(--text-secondary);">Disk</div>
+                      <div id="jarvisDiskMeter" style="font-size: 13px; font-weight: 600;">-- GB</div>
+                    </div>
+                    <div style="padding: 8px; background: var(--surface-secondary); border-radius: var(--radius-xs);">
+                      <div style="font-size: 10px; color: var(--text-secondary);">Battery</div>
+                      <div id="jarvisBatteryMeter" style="font-size: 13px; font-weight: 600;">--%</div>
+                    </div>
+                  </div>
+                  <div id="jarvisAlertsContainer" style="font-size: 12px; color: var(--text-secondary);">
+                    No active system vitals warnings. Operating inside nominal thresholds.
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Right Column: Interactive Dialogue Stream & Tool Bridge -->
+            <div class="card" style="display: flex; flex-direction: column; min-height: 580px;">
+              <div class="card-header" style="border-bottom: 1px solid var(--border); padding-bottom: 12px;">
+                <div>
+                  <h4>Conversational Dialogue & Tool Ledger</h4>
+                  <span class="card-tag">Contextual Turns & Single-Use Ticket Enforcement</span>
+                </div>
+                <button id="btnClearJarvisStream" class="btn-secondary btn-sm" style="font-size: 11px;">Clear Log</button>
+              </div>
+
+              <!-- Stream Container -->
+              <div id="jarvisTranscriptStream" class="jarvis-dialogue-stream" style="flex: 1; margin: 12px 0;">
+                <div class="jarvis-bubble assistant">
+                  <div class="jarvis-bubble-meta">
+                    <strong>404 FOUNDERS JARVIS</strong>
+                    <span style="font-size: 10px;">• Voice Ready</span>
+                  </div>
+                  <div class="jarvis-bubble-body">
+                    Namaste. Systems are calibrated and standing by. Say <em>"Hey Founders"</em>, press Space, or use the microphone above. You can speak in Hindi, English, or Hinglish.
+                  </div>
+                </div>
+              </div>
+
+              <!-- Text Fallback & Tool Bar -->
+              <div style="display: flex; gap: 8px; align-items: center; padding-top: 8px; border-top: 1px solid var(--border);">
+                <input type="text" id="txtJarvisQuery" class="form-input" placeholder="Ask in Hindi, Hinglish, or English (e.g., 'System vitals kya hain?')..." style="flex: 1; padding: 9px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); font-size: 13px;" />
+                <button id="btnJarvisSendText" class="btn-primary" style="padding: 9px 16px; font-size: 12px;">Send</button>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
       </div>
     </main>
+  </div>
+
+  <!-- Voice Enrollment Modal Dialog -->
+  <div id="modalVoiceEnrollment" class="jarvis-modal-backdrop">
+    <div class="jarvis-modal-card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h4 style="margin: 0; font-size: 16px;">Biometric Voice Enrollment</h4>
+        <button id="btnCloseEnrollModal" style="background: none; border: none; font-size: 18px; cursor: pointer; color: var(--text-secondary);">&times;</button>
+      </div>
+      <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 16px;">
+        To activate <strong>Only My Voice</strong> speaker verification, record 3 distinct phonetic calibration utterances. Speak clearly into your microphone.
+      </p>
+
+      <!-- Step 1 -->
+      <div class="enrollment-step-card" id="stepCard1">
+        <div>
+          <div style="font-weight: 600; font-size: 13px;">Utterance 1: Wake Phrase</div>
+          <div style="font-size: 12px; color: var(--text-secondary);">"Hey Founders, verify my voice profile"</div>
+          <div id="stepFeedback1" style="font-size: 11px; margin-top: 4px; color: var(--text-muted);">Ready to record</div>
+        </div>
+        <button id="btnRecordSample1" class="btn-secondary btn-sm">Record (3s)</button>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="enrollment-step-card" id="stepCard2">
+        <div>
+          <div style="font-weight: 600; font-size: 13px;">Utterance 2: Motto & Phonemes</div>
+          <div style="font-size: 12px; color: var(--text-secondary);">"Intelligence Without Boundaries"</div>
+          <div id="stepFeedback2" style="font-size: 11px; margin-top: 4px; color: var(--text-muted);">Awaiting step 1</div>
+        </div>
+        <button id="btnRecordSample2" class="btn-secondary btn-sm" disabled>Record (3s)</button>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="enrollment-step-card" id="stepCard3">
+        <div>
+          <div style="font-weight: 600; font-size: 13px;">Utterance 3: Command Phrasing</div>
+          <div style="font-size: 12px; color: var(--text-secondary);">"Activate secure workstation assistant"</div>
+          <div id="stepFeedback3" style="font-size: 11px; margin-top: 4px; color: var(--text-muted);">Awaiting step 2</div>
+        </div>
+        <button id="btnRecordSample3" class="btn-secondary btn-sm" disabled>Record (3s)</button>
+      </div>
+
+      <!-- Enrollment Actions -->
+      <div id="enrollQualityMsg" style="font-size: 12px; margin: 12px 0; min-height: 18px;"></div>
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button id="btnCancelEnrollModal" class="btn-secondary btn-sm">Cancel</button>
+        <button id="btnFinalizeEnrollment" class="btn-primary btn-sm" disabled>Generate & Encrypt Profile</button>
+      </div>
+    </div>
   </div>
 
   <script src="app.js"></script>
