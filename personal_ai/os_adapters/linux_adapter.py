@@ -29,7 +29,10 @@ from personal_ai.os_adapters.base import (
 
 PROTECTED_PROCESS_NAMES = {
     "systemd", "init", "sshd", "auditd", "kthreadd", "dbus-daemon",
-    "NetworkManager", "rsyslogd", "cron", "polkitd", "udevd"
+    "dbus-broker", "NetworkManager", "rsyslogd", "cron", "crond",
+    "polkitd", "udevd", "systemd-journald", "systemd-logind",
+    "systemd-resolved", "systemd-timesyncd", "systemd-udevd", "systemd-networkd",
+    "wpa_supplicant", "login", "agetty"
 }
 
 
@@ -218,59 +221,106 @@ class LinuxAdapter(BaseOSAdapter):
         processes: List[ProcessInfo] = []
         proc_path = Path("/proc")
 
-        for entry in os.listdir(proc_path):
-            if not entry.isdigit():
-                continue
-            pid = int(entry)
-            p_dir = proc_path / entry
-            try:
-                # Read process comm/name
-                comm_file = p_dir / "comm"
-                name = comm_file.read_text().strip() if comm_file.is_file() else f"proc_{pid}"
+        if proc_path.is_dir():
+            for entry in os.listdir(proc_path):
+                if not entry.isdigit():
+                    continue
+                pid = int(entry)
+                p_dir = proc_path / entry
+                try:
+                    # Read process comm/name
+                    comm_file = p_dir / "comm"
+                    name = comm_file.read_text().strip() if comm_file.is_file() else f"proc_{pid}"
 
-                # Read cmdline
-                cmd_file = p_dir / "cmdline"
-                cmdline = ""
-                if cmd_file.is_file():
-                    raw_cmd = cmd_file.read_bytes()
-                    cmdline = " ".join(raw_cmd.decode("utf-8", errors="replace").split("\x00")).strip()
-                if not cmdline:
-                    cmdline = name
+                    # Read cmdline
+                    cmd_file = p_dir / "cmdline"
+                    cmdline = ""
+                    if cmd_file.is_file():
+                        raw_cmd = cmd_file.read_bytes()
+                        cmdline = " ".join(raw_cmd.decode("utf-8", errors="replace").split("\x00")).strip()
+                    if not cmdline:
+                        cmdline = name
 
-                # Read status for VmRSS memory
-                status_file = p_dir / "status"
-                rss_kb = 0
-                state = "R"
-                uid_str = "0"
-                if status_file.is_file():
-                    for line in status_file.read_text(encoding="utf-8", errors="replace").splitlines():
-                        if line.startswith("VmRSS:"):
-                            rss_kb = int(line.split()[1])
-                        elif line.startswith("State:"):
-                            state = line.split()[1]
-                        elif line.startswith("Uid:"):
-                            uid_str = line.split()[1]
+                    # Read status for VmRSS memory and process relationships
+                    status_file = p_dir / "status"
+                    rss_kb = 0
+                    state = "R"
+                    uid_str = "0"
+                    ppid = -1
+                    if status_file.is_file():
+                        for line in status_file.read_text(encoding="utf-8", errors="replace").splitlines():
+                            if line.startswith("VmRSS:"):
+                                parts = line.split()
+                                if len(parts) > 1 and parts[1].isdigit():
+                                    rss_kb = int(parts[1])
+                            elif line.startswith("State:"):
+                                parts = line.split()
+                                if len(parts) > 1:
+                                    state = parts[1]
+                            elif line.startswith("Uid:"):
+                                parts = line.split()
+                                if len(parts) > 1:
+                                    uid_str = parts[1]
+                            elif line.startswith("PPid:"):
+                                parts = line.split()
+                                if len(parts) > 1 and parts[1].isdigit():
+                                    ppid = int(parts[1])
 
-                is_protected = (pid in (1, 2)) or (name in PROTECTED_PROCESS_NAMES)
+                    # Legitimate OS metadata evaluation for protected process:
+                    # 1. Core initial / scheduler PIDs
+                    is_core_pid = pid in (0, 1, 2)
 
-                processes.append(
-                    ProcessInfo(
-                        pid=pid,
-                        name=name,
-                        cpu_percent=0.0,
-                        memory_mb=round(rss_kb / 1024.0, 1),
-                        status=state,
-                        user="root" if uid_str == "0" else f"user_{uid_str}",
-                        command_line=cmdline[:160],
-                        is_protected=is_protected,
+                    # 2. Kernel threads (spawned by kthreadd PPID 2 or named kworker/ksoftirqd/etc.)
+                    is_kernel_thread = (ppid == 2) or name.startswith(("kworker", "ksoftirqd", "rcu_", "migration/", "watchdog"))
+
+                    # 3. Known critical system daemons or systemd services
+                    is_system_service = (
+                        name in PROTECTED_PROCESS_NAMES
+                        or name.startswith("systemd")
                     )
-                )
-            except (FileNotFoundError, PermissionError, ProcessLookupError):
-                continue
 
-        # Sort descending by memory usage
-        processes.sort(key=lambda p: p.memory_mb, reverse=True)
-        return processes[:limit]
+                    # 4. Check systemd cgroup slice if available
+                    is_system_slice = False
+                    cgroup_file = p_dir / "cgroup"
+                    if cgroup_file.is_file():
+                        try:
+                            cg_content = cgroup_file.read_text(encoding="utf-8", errors="replace")
+                            if "system.slice" in cg_content or "init.scope" in cg_content:
+                                if uid_str.isdigit() and int(uid_str) < 1000:
+                                    is_system_slice = True
+                        except Exception:
+                            pass
+
+                    is_protected = bool(is_core_pid or is_kernel_thread or is_system_service or is_system_slice)
+
+                    processes.append(
+                        ProcessInfo(
+                            pid=pid,
+                            name=name,
+                            cpu_percent=0.0,
+                            memory_mb=round(rss_kb / 1024.0, 1),
+                            status=state,
+                            user="root" if uid_str == "0" else f"user_{uid_str}",
+                            command_line=cmdline[:160],
+                            is_protected=is_protected,
+                        )
+                    )
+                except (FileNotFoundError, PermissionError, ProcessLookupError):
+                    continue
+
+        # Partition into protected system processes and user processes
+        protected_list = [p for p in processes if p.is_protected]
+        user_list = [p for p in processes if not p.is_protected]
+
+        # Sort protected processes by PID (ascending) so PID 1, 2, etc. are first
+        protected_list.sort(key=lambda p: p.pid)
+
+        # Sort user processes by memory usage descending (highest memory consumers first)
+        user_list.sort(key=lambda p: p.memory_mb, reverse=True)
+
+        # Combine: always include protected processes first, then top user processes up to limit
+        combined = protected_list + user_list
+        return combined[:limit]
 
     def list_network_interfaces(self) -> List[NetworkInterfaceInfo]:
         interfaces: List[NetworkInterfaceInfo] = []

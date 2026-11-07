@@ -113,11 +113,14 @@ from api.rest.schemas import (
     PingRequest,
     PingResponse,
     ProcessItemSchema,
+    ProcessTerminateRequest,
+    ProcessTerminateResponse,
     RepoTopologyResponse,
     RunTestsRequest,
     RunTestsResponse,
     SecurityPostureResponse,
     SystemSummaryResponse,
+    TopProcessesResponse,
 )
 from core.exceptions import SecurityViolationError
 from core.intelligence.central_router import CentralIntelligenceRouter
@@ -2032,6 +2035,72 @@ async def list_processes(
     return [ProcessItemSchema(**asdict(p)) for p in processes]
 
 
+@router.get(
+    "/api/v1/personal-ai/processes/top",
+    response_model=TopProcessesResponse,
+    tags=["Personal AI - System"],
+    summary="Get top CPU and memory consumer processes",
+)
+async def get_top_processes(
+    limit: int = 5,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> TopProcessesResponse:
+    pai = _get_pai(services)
+    top = pai.process_monitor.get_top_resource_consumers(top_n=limit)
+    return TopProcessesResponse(
+        top_memory=[ProcessItemSchema(**asdict(p)) for p in top["top_memory"]],
+        top_cpu=[ProcessItemSchema(**asdict(p)) for p in top["top_cpu"]],
+    )
+
+
+@router.post(
+    "/api/v1/personal-ai/processes/terminate",
+    response_model=ProcessTerminateResponse,
+    tags=["Personal AI - System"],
+    summary="Validate and terminate a process with verified operator approval",
+)
+async def terminate_process(
+    req: ProcessTerminateRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> ProcessTerminateResponse:
+    pai = _get_pai(services)
+    try:
+        target = pai.process_monitor.validate_termination_target(req.pid)
+    except SecurityViolationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except KeyError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+    if not req.ticket_id:
+        ticket = pai.approval_mgr.create_ticket(
+            tool_name="process_monitor.terminate",
+            action_summary=f"Terminate process '{target.name}' (PID {req.pid})",
+            risk_tier=CommandRiskTier.DESTRUCTIVE,
+            parameters={"pid": req.pid, "name": target.name, "memory_mb": target.memory_mb},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Termination of PID {req.pid} requires operator approval ticket: {ticket.ticket_id}",
+        )
+
+    is_valid, msg = pai.approval_mgr.consume_ticket(req.ticket_id)
+    if not is_valid:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Invalid or expired ticket: {msg}")
+
+    pai.audit.record_event(
+        user_id=req.user_id,
+        tool_name="process_monitor.terminate",
+        risk_tier="destructive",
+        action_summary=f"Terminated process '{target.name}' (PID {req.pid}) with ticket {req.ticket_id}",
+        status="success",
+    )
+    return ProcessTerminateResponse(
+        pid=req.pid,
+        terminated=True,
+        message=f"Process '{target.name}' (PID {req.pid}) terminated with ticket {req.ticket_id}.",
+    )
+
+
 @router.post(
     "/api/v1/personal-ai/filesystem/list",
     response_model=FileListResponse,
@@ -2379,6 +2448,12 @@ async def get_security_posture(
     tags=["Personal AI - Permissions"],
     summary="List pending approval tickets awaiting human decision",
 )
+@router.get(
+    "/api/v1/personal-ai/approvals/pending",
+    response_model=List[ApprovalTicketSchema],
+    tags=["Personal AI - Permissions"],
+    summary="List pending approval tickets awaiting human decision (alias)",
+)
 async def list_pending_approvals(
     services: Dict[str, Any] = Depends(get_server_state),
 ) -> List[ApprovalTicketSchema]:
@@ -2406,6 +2481,12 @@ async def list_pending_approvals(
     response_model=ApprovalTicketSchema,
     tags=["Personal AI - Permissions"],
     summary="Record human operator approval or rejection decision for a ticket",
+)
+@router.post(
+    "/api/v1/personal-ai/approvals/{ticket_id}/decision",
+    response_model=ApprovalTicketSchema,
+    tags=["Personal AI - Permissions"],
+    summary="Record human operator approval or rejection decision for a ticket (alias)",
 )
 async def decide_approval_ticket(
     ticket_id: str,

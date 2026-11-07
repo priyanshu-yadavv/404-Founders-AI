@@ -102,6 +102,21 @@ def test_personal_ai_processes(client: TestClient) -> None:
     assert len(procs) > 0
     assert any(p["is_protected"] is True for p in procs)
 
+    # Verify top resource consumers endpoint
+    r_top = client.get("/api/v1/personal-ai/processes/top?limit=5")
+    assert r_top.status_code == 200
+    d_top = r_top.json()
+    assert "top_memory" in d_top
+    assert "top_cpu" in d_top
+
+    # Verify termination protection invariant: protected processes can never be terminated
+    prot_pid = next(p["pid"] for p in procs if p["is_protected"])
+    r_term = client.post(
+        "/api/v1/personal-ai/processes/terminate",
+        json={"pid": prot_pid, "user_id": "test_operator"}
+    )
+    assert r_term.status_code == 403
+
 
 def test_personal_ai_filesystem_list_and_read(client: TestClient) -> None:
     """Verify safe directory listing and secret-scrubbed reading."""

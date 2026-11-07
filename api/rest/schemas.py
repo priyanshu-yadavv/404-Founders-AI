@@ -934,6 +934,29 @@ class ProcessItemSchema(BaseModel):
     is_protected: bool
 
 
+class TopProcessesResponse(BaseModel):
+    """Top CPU and memory consuming processes."""
+    model_config = ConfigDict(extra="ignore")
+    top_memory: List[ProcessItemSchema]
+    top_cpu: List[ProcessItemSchema]
+
+
+class ProcessTerminateRequest(BaseModel):
+    """Request to terminate a process."""
+    model_config = ConfigDict(extra="ignore")
+    pid: int
+    ticket_id: Optional[str] = None
+    user_id: str = "operator"
+
+
+class ProcessTerminateResponse(BaseModel):
+    """Response from process termination."""
+    model_config = ConfigDict(extra="ignore")
+    pid: int
+    terminated: bool
+    message: str
+
+
 class AuditLogEntrySchema(BaseModel):
     """Immutable audit trail log record."""
     model_config = ConfigDict(extra="ignore")
