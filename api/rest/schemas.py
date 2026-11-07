@@ -7,7 +7,7 @@ tokenizer operations, neural core inference, and security validation.
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class HealthResponse(BaseModel):
@@ -660,3 +660,337 @@ class LearningJobApproveRequest(BaseModel):
     approver: str = Field(..., min_length=1)
     approved: bool
     reason: str = Field("", description="Governance approval explanation")
+
+
+# ==============================================================================
+# PHASE 10 — PERSONAL AI INTEGRATION SCHEMAS
+# ==============================================================================
+
+
+class PersonalAIStatusResponse(BaseModel):
+    """Personal AI agent runtime vitals."""
+    is_running: bool
+    host: str
+    port: int
+    active_sessions_count: int
+    emergency_shutdown_active: bool
+    uptime_seconds: float
+
+
+class PersonalAISessionCreateRequest(BaseModel):
+    """Create an isolated authenticated local agent session."""
+    user_id: str = Field(..., min_length=1)
+
+
+class PersonalAISessionResponse(BaseModel):
+    """Authenticated local agent session credentials."""
+    session_id: str
+    user_id: str
+    auth_token: str
+    created_at: str
+    expires_at: str
+    is_active: bool
+
+
+class PersonalAIChatRequest(BaseModel):
+    """Natural-language personal AI assistant command or query."""
+    user_id: str = Field(..., min_length=1)
+    query: str = Field(..., min_length=1, description="Natural language prompt in English, Hindi, or Hinglish")
+    session_id: Optional[str] = None
+
+
+class PersonalAIChatResponse(BaseModel):
+    """Personal AI assistant interaction response."""
+    user_query: str
+    intent: str
+    assistant_response: str
+    action_taken: str
+    data_payload: Dict[str, Any]
+    requires_approval: bool
+    pending_ticket_id: Optional[str] = None
+
+
+class FileListRequest(BaseModel):
+    """List directory contents within authorized roots."""
+    dir_path: str = Field(".", description="Relative or authorized absolute directory path")
+    limit: int = Field(100, ge=1, le=500)
+
+
+class FileEntrySchema(BaseModel):
+    """File metadata entry."""
+    name: str
+    path: str
+    is_directory: bool
+    size_bytes: int
+    modified_at: str
+    extension: str
+    mime_type: str
+
+
+class FileListResponse(BaseModel):
+    """Directory listing result."""
+    dir_path: str
+    entries: List[FileEntrySchema]
+
+
+class FileReadRequest(BaseModel):
+    """Safe file content reading request."""
+    file_path: str = Field(..., min_length=1, description="Authorized file path to read")
+    max_bytes: int = Field(5242880, description="Max bytes to read (default 5MB)")
+
+
+class FileReadResponse(BaseModel):
+    """File content reading result with secret sanitization."""
+    path: str
+    content: str
+    size_bytes: int
+    is_truncated: bool
+    scrubbed_secrets_count: int
+    mime_type: str
+
+
+class FileSearchRequest(BaseModel):
+    """Search files by keyword or extension."""
+    root_dir: str = Field(".", description="Search root directory")
+    query: str = Field(..., min_length=1)
+    extension: Optional[str] = None
+    max_results: int = Field(50, ge=1, le=200)
+
+
+class CommandAdviseRequest(BaseModel):
+    """Analyze a proposed shell command and formulate risks and explanation."""
+    user_intent: str = Field(..., min_length=1)
+    proposed_command: str = Field(..., min_length=1)
+
+
+class CommandAdviseResponse(BaseModel):
+    """Terminal command advisory analysis."""
+    user_intent: str
+    proposed_command: str
+    binary_name: str
+    explanation: str
+    potential_risks: List[str]
+    risk_tier: str
+    requires_approval: bool
+    is_blocked: bool
+    block_reason: Optional[str] = None
+
+
+class AppItemSchema(BaseModel):
+    """Installed desktop application."""
+    name: str
+    executable: str
+    category: str
+    desktop_file_path: Optional[str] = None
+
+
+class AppStatusRequest(BaseModel):
+    """Check running status of an application."""
+    app_name: str = Field(..., min_length=1)
+
+
+class AppStatusResponse(BaseModel):
+    """Running status report."""
+    name: str
+    executable: str
+    is_running: bool
+    matching_pids: List[int]
+    total_memory_mb: float
+
+
+class AppLaunchRequest(BaseModel):
+    """Launch application via approved adapter."""
+    app_name: str = Field(..., min_length=1)
+    ticket_id: Optional[str] = None
+
+
+class AppLaunchResponse(BaseModel):
+    """Application launch result."""
+    app_name: str
+    executable: str
+    pid: Optional[int]
+    status: str
+    message: str
+
+
+class PingRequest(BaseModel):
+    """Defensive connectivity ping check."""
+    host: str = Field("127.0.0.1", min_length=1)
+    count: int = Field(2, ge=1, le=5)
+
+
+class PingResponse(BaseModel):
+    """Connectivity ping result."""
+    target_host: str
+    is_reachable: bool
+    packets_sent: int
+    packets_received: int
+    packet_loss_percent: float
+    round_trip_avg_ms: Optional[float]
+    status_summary: str
+
+
+class DNSResolveRequest(BaseModel):
+    """DNS resolution diagnostic check."""
+    hostname: str = Field(..., min_length=1)
+
+
+class DNSResolveResponse(BaseModel):
+    """DNS resolution diagnostic result."""
+    hostname: str
+    resolved_ips: List[str]
+    resolution_time_ms: float
+    is_successful: bool
+    error_message: Optional[str] = None
+
+
+class ApprovalTicketSchema(BaseModel):
+    """Action approval ticket."""
+    ticket_id: str
+    tool_name: str
+    action_summary: str
+    risk_tier: str
+    parameters: Dict[str, Any]
+    created_at: str
+    expires_at: str
+    status: str
+    decision_reason: Optional[str] = None
+    decided_by: Optional[str] = None
+
+
+class ApprovalDecisionRequest(BaseModel):
+    """Human decision on a pending approval ticket."""
+    approved: bool
+    decided_by: str = Field("human_operator", min_length=1)
+    reason: str = Field("", description="Operator rationale for decision")
+
+
+class EmergencyShutdownRequest(BaseModel):
+    """Trigger hard emergency stop."""
+    triggered_by: str = Field("human_operator", min_length=1)
+    reason: str = Field("Immediate emergency stop requested.", min_length=1)
+
+
+class EmergencyShutdownResponse(BaseModel):
+    """Emergency shutdown status."""
+    is_active: bool
+    triggered_at: Optional[str]
+    triggered_by: Optional[str]
+    reason: Optional[str]
+    revoked_tickets_count: int
+
+
+class CPUVitalsSchema(BaseModel):
+    """CPU telemetry summary."""
+    model_config = ConfigDict(extra="ignore")
+    model: str
+    physical_cores: int
+    logical_cores: int
+    usage_percent_overall: float
+    usage_percent_per_core: Optional[List[float]] = None
+    usage_per_core: Optional[List[float]] = None
+    frequency_mhz: Optional[float] = None
+    temperature_celsius: Optional[float] = None
+
+
+class MemoryVitalsSchema(BaseModel):
+    """Host memory telemetry summary."""
+    model_config = ConfigDict(extra="ignore")
+    total_ram_mb: float
+    available_ram_mb: float
+    used_ram_mb: float
+    percent_used_ram: float
+    total_swap_mb: float
+    used_swap_mb: float
+    percent_used_swap: float
+
+
+class SystemSummaryResponse(BaseModel):
+    """Host operating system and vitals summary."""
+    model_config = ConfigDict(extra="ignore")
+    os_name: str
+    os_version: str
+    architecture: str
+    hostname: str
+    kernel_version: str
+    cpu: CPUVitalsSchema
+    memory: MemoryVitalsSchema
+    storage: List[Dict[str, Any]]
+    uptime_hours: float
+    battery_percent: Optional[float] = None
+
+
+class ProcessItemSchema(BaseModel):
+    """Host process telemetry item."""
+    model_config = ConfigDict(extra="ignore")
+    pid: int
+    name: str
+    cpu_percent: float
+    memory_mb: float
+    status: str
+    username: Optional[str] = None
+    user: Optional[str] = None
+    command_line: str
+    is_protected: bool
+
+
+class AuditLogEntrySchema(BaseModel):
+    """Immutable audit trail log record."""
+    model_config = ConfigDict(extra="ignore")
+    event_id: str
+    session_id: Optional[str] = None
+    user_id: str
+    tool_name: Optional[str] = None
+    risk_tier: Optional[str] = "READ_ONLY"
+    action_description: Optional[str] = None
+    ticket_id: Optional[str] = None
+    success: bool = True
+    details: Dict[str, Any] = {}
+    timestamp: str
+
+
+class RepoTopologyResponse(BaseModel):
+    """Repository code topology summary."""
+    repo_name: str
+    root_path: str
+    is_git_repository: bool
+    branch: Optional[str] = None
+    total_files_scanned: int
+    file_type_counts: Dict[str, int]
+    primary_language: str
+    summary: str
+
+
+class GitStatusResponse(BaseModel):
+    """Defensive git status summary."""
+    branch: str
+    clean: bool
+    untracked_count: int
+    modified_count: int
+    staged_count: int
+    short_status: List[str]
+
+
+class SecurityPostureResponse(BaseModel):
+    """Defensive cybersecurity assessment."""
+    open_ports_count: int
+    open_ports: List[Dict[str, Any]]
+    active_security_modules: List[str]
+    hardening_recommendations: List[str]
+    risk_level: str
+    timestamp: str
+
+
+class RunTestsRequest(BaseModel):
+    """Execute test suite safely within repository."""
+    test_path: str = Field("tests", description="Test directory or file path within repository")
+
+
+class RunTestsResponse(BaseModel):
+    """Sandboxed test execution outcome."""
+    exit_code: int
+    stdout: str
+    stderr: str
+    duration_seconds: float
+    passed: bool
+

@@ -5,6 +5,74 @@ All notable changes to the 404 FOUNDERS project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to Phase-based Development Governance.
 
+## [Phase-10] - 2026-11-07
+
+### Added
+- **Resident Personal AI Agent Architecture:**
+  - Integrated local workstation agent respecting strict operator permissions and boundaries.
+  - `PersonalAIController` (`personal_ai/controller.py`): Central orchestrator coordinating runtime, approvals, file system, process manager, apps, network, git assistant, and security posture.
+- **Operating System Telemetry & Adapters (`personal_ai/os_adapters/`, `personal_ai/system_monitor/`):**
+  - `OSAdapter` contract with `LinuxOSAdapter` and `WindowsOSAdapter`.
+  - Zero-fabrication telemetry parsed directly from `/proc/cpuinfo`, `/proc/meminfo`, `/proc/loadavg`, `/proc/uptime`, `/proc/net/dev`, `/sys/class/thermal`, and `/sys/class/power_supply`.
+  - `SystemInfoProvider` delivering real-time normalized hardware and OS vitals.
+- **Process Monitor & Protected PID Shields (`personal_ai/system_monitor/process_monitor.py`):**
+  - Enumeration of active system processes via `/proc`.
+  - Protected PID guards preventing termination of PIDs 0, 1, 2, `systemd`, `init`, `sshd`, `auditd`, and `kthreadd`.
+  - Sorting of top CPU/memory consumers and anomaly detection.
+- **Sandboxed Filesystem Assistant (`personal_ai/filesystem/file_assistant.py`):**
+  - Strict workspace directory confinement via `os.path.realpath`. Path traversal attempts (`../../etc/shadow`) raise `SecurityViolationError`.
+  - Sensitive files blocklist (`/etc/shadow`, `~/.ssh/id_*`, `.env`).
+  - Automated secret scrubbing on file content reads using `MemorySecurityManager.scrub_secrets()`.
+- **Terminal Command Advisor (`personal_ai/terminal/command_advisor.py`):**
+  - Classifies shell commands across 5 risk tiers: `READ_ONLY`, `LOW_RISK`, `SENSITIVE`, `DESTRUCTIVE`, `PRIVILEGED`.
+  - Permanent blocking of catastrophic commands (fork bombs, `rm -rf /`, raw device writes, `curl | bash`, `chmod -R 777 /`).
+- **Application Manager (`personal_ai/apps/app_manager.py`):**
+  - Discovers installed desktop applications from `/usr/share/applications/*.desktop`.
+  - Launches approved applications only when supplied with a verified approval ticket (`TICK-...`).
+- **Safe Network Diagnostics (`personal_ai/network_analysis/network_diagnostics.py`):**
+  - Interface discovery, nameserver auditing, and latency testing with TCP socket fallback for unprivileged sandbox execution.
+- **Repository Coding Assistant (`personal_ai/coding_assistant/repo_assistant.py`):**
+  - AST syntax tree parsing, git working tree status and diff inspection (`cached=True/False`), and bounded pytest runner.
+- **Defensive Cybersecurity Assistant (`personal_ai/cybersecurity/defense_assistant.py`):**
+  - Non-root listening TCP port auditing via `/proc/net/tcp`, service mapping, and defensive hardening recommendations.
+- **Human Operator Approval Ticket Lifecycle (`personal_ai/permissions/approval_manager.py`):**
+  - Single-use cryptographic tickets (`TICK-...`) with 300-second expiration windows.
+  - State machine: `PENDING` $\to$ `APPROVED` $\to$ `CONSUMED` (or `REJECTED`, `EXPIRED`, `REVOKED`).
+- **Emergency Shutdown Kill Switch (`personal_ai/emergency/kill_switch.py`):**
+  - Instant kill switch revoking all pending tickets, preventing tool execution (`EmergencyShutdownActiveError`), and requiring operator reset.
+- **Immutable Agent Audit Ledger (`personal_ai/audit/audit_system.py`):**
+  - Structured persistence of all agent actions, approvals, and security alerts to `memory_audit_logs`.
+- **Multilingual Tool Router (`personal_ai/router.py`):**
+  - Natural-language intent parser mapping user requests in English, Devanagari Hindi, and Hinglish to appropriate tools.
+- **Local Agent Runtime (`personal_ai/runtime.py`):**
+  - Enforces localhost binding (`127.0.0.1`), token generation (`PAI-...`), and session isolation.
+- **Voice Assistant Foundation (`personal_ai/voice/voice_interface.py`):**
+  - Wake-word detection ("hey founders", "founders"), audio streaming hooks, session interrupt, and experimental speaker verification prototype with explicit safety warnings.
+- **26 REST API Endpoints (`api/rest/routes.py`, `schemas.py`, `app.py`):**
+  - Complete endpoint suite under `/api/v1/personal-ai/` covering status, session, chat, system vitals, processes, file explorer, command simulator, app launcher, network diagnostics, git topology, security posture, approvals queue, audit logs, and emergency shutdown.
+- **Warm Neutral Frontend Dashboard (`frontend/public/`):**
+  - Dedicated `#view-personal-ai` view with emergency stop bar, multilingual command composer with intent chips, real-time hardware telemetry gauges, protected process table, sandboxed file explorer with secret scrubbing badge, command advisor simulator, pending approval queue, and audit trail ledger.
+- **4 Technical Architecture Manuals in `docs/`:**
+  - `docs/PERSONAL_AI_ARCHITECTURE.md` (`DOC-PAI-001`)
+  - `docs/LOCAL_AGENT_RUNTIME.md` (`DOC-PAI-002`)
+  - `docs/PERSONAL_AI_SECURITY_PERMISSIONS.md` (`DOC-PAI-003`)
+  - `docs/PERSONAL_AI_VOICE_FOUNDATION.md` (`DOC-PAI-004`)
+- **Automated Test Suite Expansion:**
+  - Added 35 tests across 5 test modules (`tests/personal_ai/test_os_adapters_and_system_info.py`, `tests/personal_ai/test_filesystem_and_terminal_advisor.py`, `tests/personal_ai/test_agent_security_and_approval.py`, `tests/personal_ai/test_voice_and_coding_assistant.py`, `tests/api/test_personal_ai_endpoints.py`). Total repository tests: **305 passed in 13.02s**.
+
+### Changed
+- `api/rest/app.py`: Integrated `PersonalAIController`, `LocalAgentRuntime`, `ApprovalManager`, `EmergencyShutdownController`, and `AgentAuditSystem` into application state during startup.
+- `frontend/public/index.html` & `frontend/public/app.js`: Added `#view-personal-ai` dashboard panel, sidebar navigation, and interactive controller event handlers.
+
+### Security
+- Enforced strict localhost binding (`127.0.0.1`) preventing public interface exposure.
+- Enforced `READ_ONLY` default mode; non-read-only actions require explicit one-time operator approval tickets (300s TTL).
+- Process shields permanently block termination of PIDs 0, 1, 2, and critical system daemons (`systemd`, `init`, `sshd`, `auditd`, `kthreadd`).
+- Realpath sandbox boundary validation blocks directory traversal escapes (`SecurityViolationError`).
+- Synchronous secret scrubbing using `MemorySecurityManager.scrub_secrets()` redacts credentials from file inspection.
+- Circuit-breaker emergency kill switch provides immediate fail-safe shutdown.
+- Speaker verification prototype carries explicit safety warnings and never authorizes privileged operations on its own.
+
 ## [Phase-09] - 2026-11-07
 
 ### Added

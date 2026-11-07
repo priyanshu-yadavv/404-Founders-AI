@@ -1,7 +1,5 @@
 """
-404 FOUNDERS — Personal AI / Cybersecurity
-Defensive security inspection, suspicious artifact scanning, log pattern analysis,
-CVSS risk scoring, and defensive hardening recommendations.
+404 FOUNDERS — Personal AI / Cybersecurity Subsystem
 """
 
 from personal_ai.cybersecurity.cyber_engine import (
@@ -12,12 +10,20 @@ from personal_ai.cybersecurity.cyber_engine import (
     SuspiciousFileReport,
     ThreatClassification,
 )
+from personal_ai.cybersecurity.defense_assistant import (
+    DefensiveSecurityAssistant,
+    ListeningPort,
+    SecurityPostureAudit,
+)
 
 __all__ = [
-    "CybersecurityIntelligenceEngine",
-    "SecurityAuditResult",
-    "ThreatClassification",
     "CVSSScoreResult",
-    "SuspiciousFileReport",
+    "CybersecurityIntelligenceEngine",
+    "DefensiveSecurityAssistant",
+    "ListeningPort",
     "LogAnalysisReport",
+    "SecurityAuditResult",
+    "SecurityPostureAudit",
+    "SuspiciousFileReport",
+    "ThreatClassification",
 ]

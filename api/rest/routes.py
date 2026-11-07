@@ -6,6 +6,7 @@ and security validation.
 
 from __future__ import annotations
 
+from dataclasses import asdict
 import json
 import subprocess
 import time
@@ -80,6 +81,43 @@ from api.rest.schemas import (
     WorkingTaskResponse,
     WorkingTaskStartRequest,
     WorkingTaskUpdateRequest,
+    # Phase 10 Schemas
+    AppItemSchema,
+    AppLaunchRequest,
+    AppLaunchResponse,
+    AppStatusRequest,
+    AppStatusResponse,
+    ApprovalDecisionRequest,
+    ApprovalTicketSchema,
+    AuditLogEntrySchema,
+    CommandAdviseRequest,
+    CommandAdviseResponse,
+    CPUVitalsSchema,
+    DNSResolveRequest,
+    DNSResolveResponse,
+    EmergencyShutdownRequest,
+    EmergencyShutdownResponse,
+    FileEntrySchema,
+    FileListRequest,
+    FileListResponse,
+    FileReadRequest,
+    FileReadResponse,
+    FileSearchRequest,
+    GitStatusResponse,
+    MemoryVitalsSchema,
+    PersonalAIChatRequest,
+    PersonalAIChatResponse,
+    PersonalAISessionCreateRequest,
+    PersonalAISessionResponse,
+    PersonalAIStatusResponse,
+    PingRequest,
+    PingResponse,
+    ProcessItemSchema,
+    RepoTopologyResponse,
+    RunTestsRequest,
+    RunTestsResponse,
+    SecurityPostureResponse,
+    SystemSummaryResponse,
 )
 from core.exceptions import SecurityViolationError
 from core.intelligence.central_router import CentralIntelligenceRouter
@@ -1046,6 +1084,26 @@ def _get_clp(services: Dict[str, Any]):
     from learning.continual.learning_pipeline import ControlledLearningPipeline
     return services.get("learning_pipeline") or ControlledLearningPipeline()
 
+def _get_pai(services: Dict[str, Any]):
+    from personal_ai.controller import PersonalAIController
+    return services.get("personal_ai_controller") or PersonalAIController()
+
+def _get_runtime(services: Dict[str, Any]):
+    from personal_ai.runtime import LocalAgentRuntime
+    return services.get("agent_runtime") or _get_pai(services).runtime
+
+def _get_approval_mgr(services: Dict[str, Any]):
+    from personal_ai.permissions.approval_manager import ApprovalManager
+    return services.get("approval_manager") or _get_pai(services).approval_mgr
+
+def _get_emergency_ctrl(services: Dict[str, Any]):
+    from personal_ai.emergency.kill_switch import EmergencyShutdownController
+    return services.get("emergency_controller") or _get_pai(services).emergency_ctrl
+
+def _get_audit(services: Dict[str, Any]):
+    from personal_ai.audit.audit_system import AgentAuditSystem
+    return services.get("agent_audit_system") or _get_pai(services).audit
+
 
 # -----------------------------------------------------------------------------
 # Memory Records (Long-Term & Knowledge)
@@ -1839,3 +1897,613 @@ async def approve_learning_job(
         )
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+# =============================================================================
+# PHASE 10 — PERSONAL AI INTEGRATION ENDPOINTS
+# =============================================================================
+
+@router.get(
+    "/api/v1/personal-ai/status",
+    response_model=PersonalAIStatusResponse,
+    tags=["Personal AI"],
+    summary="Get Personal AI local agent runtime vitals and operational status",
+)
+async def get_personal_ai_status(
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> PersonalAIStatusResponse:
+    runtime = _get_runtime(services)
+    status_info = runtime.get_runtime_status()
+    return PersonalAIStatusResponse(
+        is_running=status_info.is_running,
+        host=status_info.host,
+        port=status_info.port,
+        active_sessions_count=status_info.active_sessions_count,
+        emergency_shutdown_active=status_info.emergency_shutdown_active,
+        uptime_seconds=status_info.uptime_seconds,
+    )
+
+
+@router.post(
+    "/api/v1/personal-ai/sessions",
+    response_model=PersonalAISessionResponse,
+    tags=["Personal AI"],
+    summary="Create an authenticated local personal AI agent session",
+)
+async def create_personal_ai_session(
+    req: PersonalAISessionCreateRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> PersonalAISessionResponse:
+    runtime = _get_runtime(services)
+    try:
+        session = runtime.create_session(req.user_id)
+        return PersonalAISessionResponse(
+            session_id=session.session_id,
+            user_id=session.user_id,
+            auth_token=session.auth_token,
+            created_at=session.created_at,
+            expires_at=session.expires_at,
+            is_active=session.is_active,
+        )
+    except SecurityViolationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post(
+    "/api/v1/personal-ai/chat",
+    response_model=PersonalAIChatResponse,
+    tags=["Personal AI"],
+    summary="Natural-language interaction with the Personal AI assistant",
+)
+async def chat_personal_ai(
+    req: PersonalAIChatRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> PersonalAIChatResponse:
+    pai = _get_pai(services)
+    try:
+        res = pai.process_request(user_id=req.user_id, query=req.query, session_id=req.session_id)
+        return PersonalAIChatResponse(
+            user_query=res.user_query,
+            intent=res.intent,
+            assistant_response=res.assistant_response,
+            action_taken=res.action_taken,
+            data_payload=res.data_payload,
+            requires_approval=res.requires_approval,
+            pending_ticket_id=res.pending_ticket_id,
+        )
+    except SecurityViolationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.get(
+    "/api/v1/personal-ai/system/summary",
+    response_model=SystemSummaryResponse,
+    tags=["Personal AI - System"],
+    summary="Inspect host operating system and hardware telemetry",
+)
+async def get_system_summary(
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> SystemSummaryResponse:
+    pai = _get_pai(services)
+    summary = pai.system_info.get_system_summary()
+    return SystemSummaryResponse(
+        os_name=summary.os_name,
+        os_version=summary.os_version,
+        architecture=summary.architecture,
+        hostname=summary.hostname,
+        kernel_version=summary.kernel_version,
+        cpu=CPUVitalsSchema(**asdict(summary.cpu)),
+        memory=MemoryVitalsSchema(**asdict(summary.memory)),
+        storage=[asdict(s) for s in summary.storage],
+        uptime_hours=summary.uptime_hours,
+        battery_percent=summary.battery_percent,
+    )
+
+
+@router.get(
+    "/api/v1/personal-ai/system/hardware",
+    response_model=Dict[str, Any],
+    tags=["Personal AI - System"],
+    summary="Hardware telemetry and operational resource utilization",
+)
+async def get_hardware_telemetry(
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> Dict[str, Any]:
+    pai = _get_pai(services)
+    return pai.system_info.get_hardware_telemetry()
+
+
+@router.get(
+    "/api/v1/personal-ai/processes",
+    response_model=List[ProcessItemSchema],
+    tags=["Personal AI - System"],
+    summary="List running host processes with protection flag and resource stats",
+)
+async def list_processes(
+    limit: int = 50,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> List[ProcessItemSchema]:
+    pai = _get_pai(services)
+    processes = pai.process_monitor.list_processes(limit=limit)
+    return [ProcessItemSchema(**asdict(p)) for p in processes]
+
+
+@router.post(
+    "/api/v1/personal-ai/filesystem/list",
+    response_model=FileListResponse,
+    tags=["Personal AI - Filesystem"],
+    summary="Safely list directory contents inside authorized project root",
+)
+async def list_directory_contents(
+    req: FileListRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> FileListResponse:
+    pai = _get_pai(services)
+    try:
+        entries = pai.filesystem.list_directory(req.dir_path, limit=req.limit)
+        return FileListResponse(
+            dir_path=req.dir_path,
+            entries=[FileEntrySchema(**asdict(e)) for e in entries],
+        )
+    except SecurityViolationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post(
+    "/api/v1/personal-ai/filesystem/read",
+    response_model=FileReadResponse,
+    tags=["Personal AI - Filesystem"],
+    summary="Read file contents with path traversal protection and secret sanitization",
+)
+async def read_file_safe(
+    req: FileReadRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> FileReadResponse:
+    pai = _get_pai(services)
+    try:
+        res = pai.filesystem.read_file_safe(req.file_path, max_bytes=req.max_bytes)
+        return FileReadResponse(
+            path=res.path,
+            content=res.content,
+            size_bytes=res.size_bytes,
+            is_truncated=res.is_truncated,
+            scrubbed_secrets_count=res.scrubbed_secrets_count,
+            mime_type=res.mime_type,
+        )
+    except SecurityViolationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post(
+    "/api/v1/personal-ai/filesystem/search",
+    response_model=FileListResponse,
+    tags=["Personal AI - Filesystem"],
+    summary="Search files inside authorized project root by query pattern",
+)
+async def search_files(
+    req: FileSearchRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> FileListResponse:
+    pai = _get_pai(services)
+    try:
+        matches = pai.filesystem.search_files(
+            query=req.query,
+            root_dir=req.root_dir,
+            extension=req.extension,
+            max_results=req.max_results,
+        )
+        return FileListResponse(
+            dir_path=req.root_dir,
+            entries=[FileEntrySchema(**asdict(m)) for m in matches],
+        )
+    except SecurityViolationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.get(
+    "/api/v1/personal-ai/apps",
+    response_model=List[AppItemSchema],
+    tags=["Personal AI - Applications"],
+    summary="List installed applications detected through desktop entries",
+)
+async def list_installed_apps(
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> List[AppItemSchema]:
+    pai = _get_pai(services)
+    apps = pai.app_manager.list_installed_applications()
+    return [AppItemSchema(**asdict(a)) for a in apps]
+
+
+@router.post(
+    "/api/v1/personal-ai/apps/status",
+    response_model=AppStatusResponse,
+    tags=["Personal AI - Applications"],
+    summary="Check running execution status and memory usage of an application",
+)
+async def get_app_status(
+    req: AppStatusRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> AppStatusResponse:
+    pai = _get_pai(services)
+    st = pai.app_manager.get_application_status(req.app_name)
+    return AppStatusResponse(
+        name=st.name,
+        executable=st.executable,
+        is_running=st.is_running,
+        matching_pids=st.matching_pids,
+        total_memory_mb=st.total_memory_mb,
+    )
+
+
+@router.post(
+    "/api/v1/personal-ai/apps/launch",
+    response_model=AppLaunchResponse,
+    tags=["Personal AI - Applications"],
+    summary="Launch application through approved adapter with human approval verification",
+)
+async def launch_app(
+    req: AppLaunchRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> AppLaunchResponse:
+    pai = _get_pai(services)
+    try:
+        res = pai.app_manager.launch_application_safe(
+            req.app_name,
+            ticket_id=req.ticket_id,
+            approval_manager=pai.approval_mgr,
+        )
+        return AppLaunchResponse(
+            app_name=res.app_name,
+            executable=res.executable,
+            pid=res.pid,
+            status=res.status,
+            message=res.message,
+        )
+    except SecurityViolationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post(
+    "/api/v1/personal-ai/terminal/advise",
+    response_model=CommandAdviseResponse,
+    tags=["Personal AI - Terminal"],
+    summary="Analyze shell command, classify risk tier, and explain safety posture",
+)
+async def advise_terminal_command(
+    req: CommandAdviseRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> CommandAdviseResponse:
+    pai = _get_pai(services)
+    adv = pai.command_advisor.analyze_command(req.proposed_command, req.user_intent)
+    return CommandAdviseResponse(
+        user_intent=adv.user_intent,
+        proposed_command=adv.proposed_command,
+        binary_name=adv.binary_name,
+        explanation=adv.explanation,
+        potential_risks=adv.potential_risks,
+        risk_tier=adv.risk_tier.value,
+        requires_approval=adv.requires_approval,
+        is_blocked=adv.is_blocked,
+        block_reason=adv.block_reason,
+    )
+
+
+@router.get(
+    "/api/v1/personal-ai/network/diagnostics",
+    response_model=Dict[str, Any],
+    tags=["Personal AI - Network"],
+    summary="Inspect network interfaces and DNS resolver configuration",
+)
+async def get_network_diagnostics(
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> Dict[str, Any]:
+    pai = _get_pai(services)
+    return pai.network.get_network_overview()
+
+
+@router.post(
+    "/api/v1/personal-ai/network/ping",
+    response_model=PingResponse,
+    tags=["Personal AI - Network"],
+    summary="Run bounded, non-destructive network ping diagnostic",
+)
+async def ping_network_target(
+    req: PingRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> PingResponse:
+    pai = _get_pai(services)
+    try:
+        res = pai.network.test_connectivity(host=req.host, count=req.count)
+        return PingResponse(
+            target_host=res.target_host,
+            is_reachable=res.is_reachable,
+            packets_sent=res.packets_sent,
+            packets_received=res.packets_received,
+            packet_loss_percent=res.packet_loss_percent,
+            round_trip_avg_ms=res.round_trip_avg_ms,
+            status_summary=res.status_summary,
+        )
+    except SecurityViolationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post(
+    "/api/v1/personal-ai/network/dns",
+    response_model=DNSResolveResponse,
+    tags=["Personal AI - Network"],
+    summary="Resolve DNS hostnames safely and measure response latency",
+)
+async def resolve_dns_hostname(
+    req: DNSResolveRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> DNSResolveResponse:
+    pai = _get_pai(services)
+    res = pai.network.resolve_dns(req.hostname)
+    return DNSResolveResponse(
+        hostname=res.hostname,
+        resolved_ips=res.resolved_ips,
+        resolution_time_ms=res.resolution_time_ms,
+        is_successful=res.is_successful,
+        error_message=res.error_message,
+    )
+
+
+@router.get(
+    "/api/v1/personal-ai/coding/repo",
+    response_model=RepoTopologyResponse,
+    tags=["Personal AI - Coding"],
+    summary="Analyze repository project topology and codebase language distribution",
+)
+async def get_repo_topology(
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> RepoTopologyResponse:
+    pai = _get_pai(services)
+    top = pai.repo_assistant.analyze_project_topology()
+    return RepoTopologyResponse(
+        repo_name=top.repo_name,
+        root_path=top.root_path,
+        is_git_repository=top.is_git_repository,
+        branch=top.branch,
+        total_files_scanned=top.total_files_scanned,
+        file_type_counts=top.file_type_counts,
+        primary_language=top.primary_language,
+        summary=top.summary,
+    )
+
+
+@router.get(
+    "/api/v1/personal-ai/coding/git",
+    response_model=GitStatusResponse,
+    tags=["Personal AI - Coding"],
+    summary="Inspect git repository status non-destructively",
+)
+async def get_git_status(
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> GitStatusResponse:
+    pai = _get_pai(services)
+    st = pai.repo_assistant.inspect_git_status()
+    return GitStatusResponse(
+        branch=st.branch,
+        clean=st.clean,
+        untracked_count=st.untracked_count,
+        modified_count=st.modified_count,
+        staged_count=st.staged_count,
+        short_status=st.short_status,
+    )
+
+
+@router.get(
+    "/api/v1/personal-ai/coding/diff",
+    response_model=Dict[str, Any],
+    tags=["Personal AI - Coding"],
+    summary="Inspect staged and unstaged git diffs non-destructively",
+)
+async def get_git_diff(
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> Dict[str, Any]:
+    pai = _get_pai(services)
+    return {
+        "staged": pai.repo_assistant.inspect_git_diff(cached=True),
+        "unstaged": pai.repo_assistant.inspect_git_diff(cached=False),
+    }
+
+
+@router.post(
+    "/api/v1/personal-ai/coding/tests",
+    response_model=RunTestsResponse,
+    tags=["Personal AI - Coding"],
+    summary="Run test suite safely within the repository",
+)
+async def run_repository_tests(
+    req: RunTestsRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> RunTestsResponse:
+    pai = _get_pai(services)
+    try:
+        res = pai.repo_assistant.run_tests_safe(test_path=req.test_path)
+        return RunTestsResponse(
+            exit_code=res.exit_code,
+            stdout=res.stdout,
+            stderr=res.stderr,
+            duration_seconds=res.duration_seconds,
+            passed=res.passed,
+        )
+    except SecurityViolationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.get(
+    "/api/v1/personal-ai/security/posture",
+    response_model=SecurityPostureResponse,
+    tags=["Personal AI - Security"],
+    summary="Defensive cybersecurity posture and open port audit",
+)
+async def get_security_posture(
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> SecurityPostureResponse:
+    pai = _get_pai(services)
+    posture = pai.security.assess_security_posture()
+    return SecurityPostureResponse(
+        open_ports_count=posture.open_ports_count,
+        open_ports=[asdict(p) for p in posture.open_ports],
+        active_security_modules=posture.active_security_modules,
+        hardening_recommendations=posture.hardening_recommendations,
+        risk_level=posture.risk_level,
+        timestamp=posture.timestamp,
+    )
+
+
+@router.get(
+    "/api/v1/personal-ai/approvals",
+    response_model=List[ApprovalTicketSchema],
+    tags=["Personal AI - Permissions"],
+    summary="List pending approval tickets awaiting human decision",
+)
+async def list_pending_approvals(
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> List[ApprovalTicketSchema]:
+    mgr = _get_approval_mgr(services)
+    tickets = mgr.get_pending_tickets()
+    return [
+        ApprovalTicketSchema(
+            ticket_id=t.ticket_id,
+            tool_name=t.tool_name,
+            action_summary=t.action_summary,
+            risk_tier=t.risk_tier.value,
+            parameters=t.parameters,
+            created_at=t.created_at,
+            expires_at=t.expires_at,
+            status=t.status.value,
+            decision_reason=t.decision_reason,
+            decided_by=t.decided_by,
+        )
+        for t in tickets
+    ]
+
+
+@router.post(
+    "/api/v1/personal-ai/approvals/{ticket_id}",
+    response_model=ApprovalTicketSchema,
+    tags=["Personal AI - Permissions"],
+    summary="Record human operator approval or rejection decision for a ticket",
+)
+async def decide_approval_ticket(
+    ticket_id: str,
+    req: ApprovalDecisionRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> ApprovalTicketSchema:
+    mgr = _get_approval_mgr(services)
+    try:
+        t = mgr.record_decision(
+            ticket_id=ticket_id,
+            approved=req.approved,
+            decided_by=req.decided_by,
+            reason=req.reason,
+        )
+        return ApprovalTicketSchema(
+            ticket_id=t.ticket_id,
+            tool_name=t.tool_name,
+            action_summary=t.action_summary,
+            risk_tier=t.risk_tier.value,
+            parameters=t.parameters,
+            created_at=t.created_at,
+            expires_at=t.expires_at,
+            status=t.status.value,
+            decision_reason=t.decision_reason,
+            decided_by=t.decided_by,
+        )
+    except SecurityViolationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.get(
+    "/api/v1/personal-ai/audit/logs",
+    response_model=List[AuditLogEntrySchema],
+    tags=["Personal AI - Audit"],
+    summary="Inspect immutable audit ledger of personal agent actions",
+)
+async def get_audit_logs(
+    limit: int = 50,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> List[AuditLogEntrySchema]:
+    audit = _get_audit(services)
+    entries = audit.get_recent_logs(limit=limit)
+    return [
+        AuditLogEntrySchema(
+            event_id=e.event_id,
+            session_id=e.session_id,
+            user_id=e.user_id,
+            tool_name=e.tool_name,
+            risk_tier=e.risk_tier,
+            action_description=e.action_description,
+            ticket_id=e.ticket_id,
+            success=e.success,
+            details=e.details,
+            timestamp=e.timestamp,
+        )
+        for e in entries
+    ]
+
+
+@router.post(
+    "/api/v1/personal-ai/emergency/shutdown",
+    response_model=EmergencyShutdownResponse,
+    tags=["Personal AI - Emergency"],
+    summary="Instantly trigger emergency kill switch disabling local agent execution",
+)
+async def trigger_emergency_shutdown(
+    req: EmergencyShutdownRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> EmergencyShutdownResponse:
+    ctrl = _get_emergency_ctrl(services)
+    status_info = ctrl.trigger_shutdown(triggered_by=req.triggered_by, reason=req.reason)
+    return EmergencyShutdownResponse(
+        is_active=status_info.is_active,
+        triggered_at=status_info.triggered_at,
+        triggered_by=status_info.triggered_by,
+        reason=status_info.reason,
+        revoked_tickets_count=status_info.revoked_tickets_count,
+    )
+
+
+@router.post(
+    "/api/v1/personal-ai/emergency/reset",
+    response_model=EmergencyShutdownResponse,
+    tags=["Personal AI - Emergency"],
+    summary="Reset emergency kill switch to re-enable agent operations",
+)
+async def reset_emergency_shutdown(
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> EmergencyShutdownResponse:
+    ctrl = _get_emergency_ctrl(services)
+    status_info = ctrl.reset(reset_by="human_operator")
+    return EmergencyShutdownResponse(
+        is_active=status_info.is_active,
+        triggered_at=status_info.triggered_at,
+        triggered_by=status_info.triggered_by,
+        reason=status_info.reason,
+        revoked_tickets_count=status_info.revoked_tickets_count,
+    )
+

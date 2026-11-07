@@ -1,7 +1,5 @@
 """
-404 FOUNDERS — Personal AI / Coding Assistant
-Defensive code intelligence, AST parsing, multi-language detection,
-complexity analysis, and sandbox execution boundaries.
+404 FOUNDERS — Personal AI / Coding & Repository Subsystem
 """
 
 from personal_ai.coding_assistant.coding_engine import (
@@ -12,12 +10,22 @@ from personal_ai.coding_assistant.coding_engine import (
     LanguageDetectionResult,
     SandboxExecutionNotice,
 )
+from personal_ai.coding_assistant.repo_assistant import (
+    GitStatusResult,
+    RepoSummary,
+    RepositoryAssistant,
+    TestRunResult,
+)
 
 __all__ = [
-    "CodingIntelligenceEngine",
     "CodeAnalysisResult",
     "CodeIssue",
+    "CodingIntelligenceEngine",
     "ComplexityReport",
+    "GitStatusResult",
     "LanguageDetectionResult",
+    "RepoSummary",
+    "RepositoryAssistant",
     "SandboxExecutionNotice",
+    "TestRunResult",
 ]

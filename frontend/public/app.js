@@ -32,6 +32,10 @@ const viewMetadata = {
     title: 'Personal AI & Multi-Layer Memory',
     subtitle: 'KV-Cache, episodic logs, vector embeddings, and local data sovereignty'
   },
+  'personal-ai': {
+    title: 'Personal AI Agent & Local Workstation Controller',
+    subtitle: 'Zero-fabrication telemetry, sandboxed file assistant, command safety advisor, and approval workflow'
+  },
   api: {
     title: 'API Specifications & Interactive Docs',
     subtitle: 'FastAPI OpenAPI 3.1.0 interactive documentation and verification endpoints'
@@ -125,6 +129,12 @@ function switchView(viewKey) {
     fetchClusterCatalog();
   } else if (viewKey === 'coding') {
     fetchGitStatus();
+  } else if (viewKey === 'personal-ai') {
+    fetchPersonalAIStatus();
+    fetchPersonalAIHardware();
+    fetchPersonalAIProcesses();
+    fetchPersonalAIApprovals();
+    fetchPersonalAIAuditLogs();
   }
 }
 
@@ -1446,6 +1456,413 @@ async function loadPreferences() {
 }
 
 // -------------------------------------------------------------------------
+// Personal AI Workstation Controller (Phase 10)
+// -------------------------------------------------------------------------
+
+let allProcessesCache = [];
+
+async function fetchPersonalAIStatus() {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/personal-ai/status`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const statusText = document.getElementById('paiStatusText');
+    const statusDot = document.getElementById('paiStatusDot');
+    const resetBtn = document.getElementById('btnEmergencyReset');
+    const killBtn = document.getElementById('btnEmergencyShutdown');
+    if (data.emergency_shutdown_active) {
+      if (statusText) statusText.textContent = 'EMERGENCY SHUTDOWN ACTIVE';
+      if (statusDot) statusDot.style.backgroundColor = 'var(--status-error)';
+      if (resetBtn) resetBtn.style.display = 'inline-block';
+      if (killBtn) killBtn.style.display = 'none';
+    } else {
+      if (statusText) statusText.textContent = `Localhost Bound (${data.host}:${data.port})`;
+      if (statusDot) statusDot.style.backgroundColor = 'var(--status-online)';
+      if (resetBtn) resetBtn.style.display = 'none';
+      if (killBtn) killBtn.style.display = 'inline-block';
+    }
+  } catch (e) {
+    console.error('Failed to fetch personal AI status', e);
+  }
+}
+
+async function fetchPersonalAIHardware() {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/personal-ai/system/summary`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const osName = document.getElementById('paiOsName');
+    const kernelArch = document.getElementById('paiKernelArch');
+    const cpuModel = document.getElementById('paiCpuModel');
+    const cpuUsage = document.getElementById('paiCpuUsage');
+    const ramUsage = document.getElementById('paiRamUsage');
+    const uptime = document.getElementById('paiUptime');
+
+    if (osName) osName.textContent = `${data.os_name} ${data.os_version}`;
+    if (kernelArch) kernelArch.textContent = `${data.kernel_version} (${data.architecture})`;
+    if (cpuModel) cpuModel.textContent = `${data.cpu.model} (${data.cpu.logical_cores} threads)`;
+    if (cpuUsage) cpuUsage.textContent = `${data.cpu.usage_percent_overall.toFixed(1)}%`;
+    if (ramUsage) ramUsage.textContent = `${data.memory.used_ram_mb.toFixed(0)} MB / ${data.memory.total_ram_mb.toFixed(0)} MB (${data.memory.percent_used_ram.toFixed(1)}%)`;
+    if (uptime) uptime.textContent = `${data.uptime_hours.toFixed(2)} hrs`;
+  } catch (e) {
+    console.error('Failed to fetch hardware summary', e);
+  }
+}
+
+async function fetchPersonalAIProcesses() {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/personal-ai/processes?limit=60`);
+    if (!res.ok) return;
+    allProcessesCache = await res.json();
+    renderProcessesTable(allProcessesCache);
+  } catch (e) {
+    console.error('Failed to fetch processes', e);
+  }
+}
+
+function renderProcessesTable(processes) {
+  const tbody = document.getElementById('paiProcessesTableBody');
+  if (!tbody) return;
+  if (!processes || processes.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="padding: 8px; text-align: center; color: var(--text-muted);">No processes found.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = processes.map(p => `
+    <tr style="border-bottom: 1px solid var(--border);">
+      <td style="padding: 4px; font-family: var(--font-mono);">${p.pid}</td>
+      <td style="padding: 4px; font-weight: 500;">
+        ${escapeHtml(p.name)}
+        ${p.is_protected ? '<span style="font-size: 9px; padding: 1px 4px; background-color: var(--surface-secondary); border-radius: 2px; color: var(--accent-primary); font-weight: 600; margin-left: 4px;">GUARDED</span>' : ''}
+      </td>
+      <td style="padding: 4px;">${p.cpu_percent.toFixed(1)}%</td>
+      <td style="padding: 4px;">${p.memory_mb.toFixed(1)}</td>
+      <td style="padding: 4px; color: var(--text-secondary);">${p.status}</td>
+    </tr>
+  `).join('');
+}
+
+async function fetchPersonalAIFiles(dirPath = '.') {
+  try {
+    const tbody = document.getElementById('paiFilesTableBody');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="4" style="padding: 8px; text-align: center; color: var(--text-muted);">Scanning directory...</td></tr>';
+    const res = await fetch(`${API_BASE}/api/v1/personal-ai/filesystem/list`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dir_path: dirPath, limit: 100 })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      if (tbody) tbody.innerHTML = `<tr><td colspan="4" style="padding: 8px; text-align: center; color: var(--status-error);">${escapeHtml(err.detail || 'Access blocked by security guard')}</td></tr>`;
+      return;
+    }
+    const data = await res.json();
+    if (!data.entries || data.entries.length === 0) {
+      if (tbody) tbody.innerHTML = '<tr><td colspan="4" style="padding: 8px; text-align: center; color: var(--text-muted);">Directory is empty.</td></tr>';
+      return;
+    }
+    if (tbody) {
+      tbody.innerHTML = data.entries.map(e => `
+        <tr style="border-bottom: 1px solid var(--border);">
+          <td style="padding: 4px;">${escapeHtml(e.name)}</td>
+          <td style="padding: 4px; color: var(--text-secondary);">${e.is_directory ? 'DIR' : (e.extension || 'FILE')}</td>
+          <td style="padding: 4px;">${e.is_directory ? '-' : `${(e.size_bytes / 1024).toFixed(1)} KB`}</td>
+          <td style="padding: 4px;">
+            ${!e.is_directory ? `<button class="btn-secondary" style="font-size: 10px; padding: 2px 6px;" onclick="window.paiInspectFile('${escapeHtml(e.path)}')">Read</button>` : ''}
+          </td>
+        </tr>
+      `).join('');
+    }
+  } catch (e) {
+    console.error('Failed to list files', e);
+  }
+}
+
+window.paiInspectFile = async function(filePath) {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/personal-ai/filesystem/read`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ file_path: filePath, max_bytes: 524288 })
+    });
+    const previewBox = document.getElementById('paiFilePreviewBox');
+    const filenameLabel = document.getElementById('paiPreviewFilename');
+    const badgeLabel = document.getElementById('paiPreviewSecretsBadge');
+    const contentBox = document.getElementById('paiFilePreviewContent');
+    if (!res.ok) {
+      const err = await res.json();
+      alert(`Read Error: ${err.detail || 'Access denied'}`);
+      return;
+    }
+    const data = await res.json();
+    if (previewBox) previewBox.style.display = 'block';
+    if (filenameLabel) filenameLabel.textContent = data.path;
+    if (badgeLabel) {
+      badgeLabel.textContent = data.scrubbed_secrets_count > 0 ? `${data.scrubbed_secrets_count} secrets scrubbed` : 'Sanitized clean';
+    }
+    if (contentBox) contentBox.textContent = data.content.slice(0, 2000) + (data.content.length > 2000 ? '\n... [truncated]' : '');
+  } catch (e) {
+    console.error('Failed to read file', e);
+  }
+};
+
+async function fetchPersonalAIApprovals() {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/personal-ai/approvals`);
+    if (!res.ok) return;
+    const tickets = await res.json();
+    const countBadge = document.getElementById('paiPendingCountBadge');
+    const container = document.getElementById('paiApprovalsContainer');
+    if (countBadge) countBadge.textContent = `${tickets.length} Pending`;
+    if (!container) return;
+    if (tickets.length === 0) {
+      container.innerHTML = '<div style="padding: 16px; text-align: center; color: var(--text-muted); font-size: 12px;">No pending action approval tickets in queue.</div>';
+      return;
+    }
+    container.innerHTML = tickets.map(t => `
+      <div class="card" style="margin-bottom: 8px; padding: 10px; background-color: var(--surface-secondary);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <strong style="font-size: 11px;">Ticket: ${escapeHtml(t.ticket_id)}</strong>
+          <span class="card-tag" style="background-color: #FFF2DF; color: var(--accent-secondary);">${escapeHtml(t.risk_tier)}</span>
+        </div>
+        <div style="font-size: 11px; margin-bottom: 4px;"><strong>Tool:</strong> ${escapeHtml(t.tool_name)} &bull; ${escapeHtml(t.action_summary)}</div>
+        <div style="font-size: 10px; color: var(--text-muted); margin-bottom: 8px;">Expires: ${escapeHtml(t.expires_at)}</div>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn-primary" style="font-size: 10px; padding: 3px 10px;" onclick="window.paiDecideTicket('${escapeHtml(t.ticket_id)}', true)">Approve</button>
+          <button class="btn-secondary" style="font-size: 10px; padding: 3px 10px; color: #9E3A3A; border-color: #9E3A3A;" onclick="window.paiDecideTicket('${escapeHtml(t.ticket_id)}', false)">Reject</button>
+        </div>
+      </div>
+    `).join('');
+  } catch (e) {
+    console.error('Failed to fetch approvals', e);
+  }
+}
+
+window.paiDecideTicket = async function(ticketId, approved) {
+  const reason = prompt(approved ? 'Operator approval rationale:' : 'Operator rejection rationale:') || 'Operator decision';
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/personal-ai/approvals/${ticketId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ approved, decided_by: 'human_operator', reason })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      alert(`Decision error: ${err.detail || 'Failed'}`);
+    } else {
+      fetchPersonalAIApprovals();
+      fetchPersonalAIAuditLogs();
+    }
+  } catch (e) {
+    console.error('Failed to record decision', e);
+  }
+};
+
+async function fetchPersonalAIAuditLogs() {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/personal-ai/audit/logs?limit=40`);
+    if (!res.ok) return;
+    const logs = await res.json();
+    const tbody = document.getElementById('paiAuditTableBody');
+    if (!tbody) return;
+    if (logs.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" style="padding: 8px; text-align: center; color: var(--text-muted);">No audit logs yet.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = logs.map(l => `
+      <tr style="border-bottom: 1px solid var(--border);">
+        <td style="padding: 4px; color: var(--text-muted); font-size: 10px;">${escapeHtml(l.timestamp.slice(11, 19))}</td>
+        <td style="padding: 4px; font-weight: 500;">${escapeHtml(l.tool_name)}</td>
+        <td style="padding: 4px;">
+          <span style="font-size: 9px; padding: 1px 4px; border-radius: 2px; background-color: var(--surface-secondary);">${escapeHtml(l.risk_tier)}</span>
+        </td>
+        <td style="padding: 4px; color: var(--text-secondary);">${escapeHtml(l.action_description)}</td>
+      </tr>
+    `).join('');
+  } catch (e) {
+    console.error('Failed to fetch audit logs', e);
+  }
+}
+
+async function sendPaiChat() {
+  const input = document.getElementById('paiChatInput');
+  const query = (input?.value || '').trim();
+  if (!query) return;
+
+  const btn = document.getElementById('btnPaiSendChat');
+  const outBox = document.getElementById('paiChatOutputBox');
+  const intentLabel = document.getElementById('paiResponseIntent');
+  const actionLabel = document.getElementById('paiResponseAction');
+  const textLabel = document.getElementById('paiResponseText');
+  const ticketNotice = document.getElementById('paiPendingTicketNotice');
+  const ticketIdLabel = document.getElementById('paiTicketIdLabel');
+  const payloadJson = document.getElementById('paiPayloadJson');
+
+  if (btn) btn.disabled = true;
+  if (outBox) outBox.style.display = 'block';
+  if (textLabel) textLabel.textContent = 'Processing request through local intelligence router...';
+
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/personal-ai/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: 'default_operator', query })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      if (textLabel) textLabel.textContent = `Error (${res.status}): ${data.detail || 'Request failed'}`;
+      return;
+    }
+    if (intentLabel) intentLabel.textContent = `INTENT: ${data.intent}`;
+    if (actionLabel) actionLabel.textContent = `ACTION: ${data.action_taken}`;
+    if (textLabel) textLabel.textContent = data.assistant_response;
+
+    if (data.requires_approval && data.pending_ticket_id) {
+      if (ticketNotice) ticketNotice.style.display = 'block';
+      if (ticketIdLabel) ticketIdLabel.textContent = data.pending_ticket_id;
+      fetchPersonalAIApprovals();
+    } else {
+      if (ticketNotice) ticketNotice.style.display = 'none';
+    }
+
+    if (payloadJson) payloadJson.textContent = JSON.stringify(data.data_payload, null, 2);
+    fetchPersonalAIAuditLogs();
+  } catch (e) {
+    if (textLabel) textLabel.textContent = `Network / connection error: ${e.message}`;
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function initPersonalAI() {
+  const btnChat = document.getElementById('btnPaiSendChat');
+  if (btnChat) btnChat.addEventListener('click', sendPaiChat);
+
+  document.querySelectorAll('.pai-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const input = document.getElementById('paiChatInput');
+      if (input) {
+        input.value = btn.getAttribute('data-prompt') || '';
+        sendPaiChat();
+      }
+    });
+  });
+
+  const btnKill = document.getElementById('btnEmergencyShutdown');
+  if (btnKill) {
+    btnKill.addEventListener('click', async () => {
+      if (!confirm('Are you sure you want to trigger the emergency kill switch? All pending tickets will be revoked.')) return;
+      try {
+        await fetch(`${API_BASE}/api/v1/personal-ai/emergency/shutdown`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ triggered_by: 'human_operator', reason: 'Operator triggered from dashboard' })
+        });
+        fetchPersonalAIStatus();
+        fetchPersonalAIApprovals();
+        fetchPersonalAIAuditLogs();
+      } catch (e) {
+        alert(`Kill switch error: ${e.message}`);
+      }
+    });
+  }
+
+  const btnReset = document.getElementById('btnEmergencyReset');
+  if (btnReset) {
+    btnReset.addEventListener('click', async () => {
+      try {
+        await fetch(`${API_BASE}/api/v1/personal-ai/emergency/reset`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        fetchPersonalAIStatus();
+        fetchPersonalAIAuditLogs();
+      } catch (e) {
+        alert(`Reset error: ${e.message}`);
+      }
+    });
+  }
+
+  const btnRefreshHw = document.getElementById('btnRefreshHardware');
+  if (btnRefreshHw) btnRefreshHw.addEventListener('click', fetchPersonalAIHardware);
+
+  const btnRefreshProc = document.getElementById('btnRefreshProcesses');
+  if (btnRefreshProc) btnRefreshProc.addEventListener('click', fetchPersonalAIProcesses);
+
+  const procFilter = document.getElementById('paiProcessFilter');
+  if (procFilter) {
+    procFilter.addEventListener('input', (e) => {
+      const q = (e.target.value || '').toLowerCase();
+      const filtered = allProcessesCache.filter(p => p.name.toLowerCase().includes(q) || String(p.pid).includes(q));
+      renderProcessesTable(filtered);
+    });
+  }
+
+  const btnListFiles = document.getElementById('btnPaiListFiles');
+  if (btnListFiles) {
+    btnListFiles.addEventListener('click', () => {
+      const p = (document.getElementById('paiFilePathInput')?.value || '.').trim();
+      fetchPersonalAIFiles(p);
+    });
+  }
+  const btnRefreshFiles = document.getElementById('btnRefreshFiles');
+  if (btnRefreshFiles) {
+    btnRefreshFiles.addEventListener('click', () => {
+      fetchPersonalAIFiles('.');
+    });
+  }
+
+  const btnAdvise = document.getElementById('btnAdviseCommand');
+  if (btnAdvise) {
+    btnAdvise.addEventListener('click', async () => {
+      const cmd = (document.getElementById('paiCommandAdvisorInput')?.value || '').trim();
+      if (!cmd) return;
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/personal-ai/terminal/advise`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ proposed_command: cmd, user_intent: 'safety inspection' })
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const resBox = document.getElementById('paiCommandAdvisorResult');
+        const binLabel = document.getElementById('paiCmdBinary');
+        const riskBadge = document.getElementById('paiCmdRiskBadge');
+        const expLabel = document.getElementById('paiCmdExplanation');
+        const risksList = document.getElementById('paiCmdRisksList');
+        if (resBox) resBox.style.display = 'block';
+        if (binLabel) binLabel.textContent = `Binary: ${data.binary_name} ${data.is_blocked ? '(BLOCKED)' : ''}`;
+        if (riskBadge) {
+          riskBadge.textContent = `TIER: ${data.risk_tier}`;
+          riskBadge.style.color = data.risk_tier === 'READ_ONLY' ? 'var(--status-online)' : (data.risk_tier === 'DESTRUCTIVE' ? 'var(--status-error)' : 'var(--accent-secondary)');
+        }
+        if (expLabel) expLabel.textContent = data.explanation;
+        if (risksList) {
+          risksList.textContent = data.potential_risks.length > 0 ? `Risks: ${data.potential_risks.join('; ')}` : 'No elevated hazards identified.';
+        }
+      } catch (e) {
+        console.error('Command advise failed', e);
+      }
+    });
+  }
+
+  document.querySelectorAll('.pai-cmd-sample').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const input = document.getElementById('paiCommandAdvisorInput');
+      if (input) {
+        input.value = btn.getAttribute('data-cmd') || '';
+        document.getElementById('btnAdviseCommand')?.click();
+      }
+    });
+  });
+
+  const btnRefreshAppr = document.getElementById('btnRefreshApprovals');
+  if (btnRefreshAppr) btnRefreshAppr.addEventListener('click', fetchPersonalAIApprovals);
+
+  const btnRefreshAudit = document.getElementById('btnRefreshAuditLogs');
+  if (btnRefreshAudit) btnRefreshAudit.addEventListener('click', fetchPersonalAIAuditLogs);
+}
+
+// -------------------------------------------------------------------------
 // Initialization
 // -------------------------------------------------------------------------
 
@@ -1455,6 +1872,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initChat();
   initMultimodalStudio();
   initMemoryManager();
+  initPersonalAI();
 
   // Telemetry handlers
   const btnRefreshTel = document.getElementById('btnRefreshTel');

@@ -427,7 +427,65 @@ flowchart TD
 
 ---
 
-## 11. Development Roadmap & Phase Status
+## 11. Personal AI Integration & Security Architecture (Phase 10)
+
+Phase 10 establishes the resident Personal AI Agent integrating 404 FOUNDERS directly with the local workstation across operating system telemetry, process management, sandboxed filesystem assistance, safe terminal command advisory, desktop app launching, defensive cybersecurity posture, and human operator approvals.
+
+```mermaid
+flowchart TD
+    UserPrompt["Operator Natural Language Input<br/>(English / Devanagari Hindi / Hinglish)"] --> Router["Multilingual Tool Router<br/>Intent & Entity Extraction"]
+    
+    subgraph CONTROLLER ["Personal AI Controller (Localhost: 127.0.0.1)"]
+        Router --> ModeCheck{"Mode Check<br/>Default: READ_ONLY"}
+        ModeCheck -->|Read-Only Queries| ReadEngines["Direct Safe Execution"]
+        ModeCheck -->|Mutating / Privileged Action| ApprovalGate["Approval Manager<br/>Single-Use Ticket (300s TTL)"]
+        
+        subgraph MODULES ["Specialized Local Modules"]
+            OST["OS Adapters & Telemetry<br/>Linux /proc & /sys (Zero Fabrication)"]
+            PROC["Process Monitor<br/>Protected PID Guards (0, 1, 2, systemd, init)"]
+            FS["Sandboxed Filesystem<br/>Realpath Check & Secret Redaction"]
+            TERM["Command Advisor<br/>5 Risk Tiers & Hazardous Pattern Blocking"]
+            APP["App Manager<br/>Verified Ticket Launch Only"]
+            NET["Network Diagnostics<br/>Interfaces, DNS & Socket Latency"]
+            GIT["Coding Assistant<br/>AST Parsing, Git Diff & Bounded Tests"]
+            SEC["Defensive Cybersecurity<br/>Listening TCP Ports & Hardening Audit"]
+        end
+        
+        subgraph SAFETY ["Safety & Governance Boundary"]
+            KILL["Emergency Shutdown Controller<br/>Instant Revocation & Kill Switch"]
+            AUDIT["Agent Audit System<br/>Immutable memory_audit_logs"]
+            VOICE["Voice Assistant Foundation<br/>Wake Word + Prototype Speaker Verifier"]
+        end
+        
+        ReadEngines --> OST
+        ReadEngines --> PROC
+        ReadEngines --> FS
+        ReadEngines --> TERM
+        ReadEngines --> NET
+        ReadEngines --> GIT
+        ReadEngines --> SEC
+        
+        ApprovalGate -->|Ticket Approved| APP
+        ApprovalGate -->|Ticket Approved| FS
+        ApprovalGate -->|Ticket Approved| PROC
+    end
+    
+    KILL -.->|Halts All Executions & Revokes Tickets| CONTROLLER
+    CONTROLLER --> AUDIT
+```
+
+### Core Security Invariants
+1. **Localhost-Only Enforcement:** Bound strictly to `127.0.0.1`; never exposed to public network interfaces.
+2. **Read-Only Default Mode:** The agent defaults to `READ_ONLY`. All mutating, destructive, or privileged actions require an explicit human operator approval ticket (`TICK-...`) with a 300-second expiration window.
+3. **Protected Process Shields:** PIDs 0, 1, 2, `systemd`, `init`, `sshd`, `auditd`, and `kthreadd` are strictly protected; termination requests are blocked unconditionally.
+4. **Filesystem Traversal Boundary:** Workspace access is enforced via `os.path.realpath`. Path traversal attempts (`../../etc/shadow`) raise `SecurityViolationError`, and sensitive credentials are automatically redacted with `MemorySecurityManager.scrub_secrets()`.
+5. **Zero Hardware Fabrication:** All telemetry metrics (CPU load, memory usage, thermals, battery, disk, network) are read empirically from the host operating system.
+6. **Emergency Kill Switch:** Immediate shutdown controller instantly invalidates all pending approval tickets and halts runtime execution.
+7. **Voice Biometric Safety Boundary:** Voice interaction provides hands-free accessibility with wake-word detection; speaker verification is strictly an experimental prototype and never authorizes privileged actions on its own.
+
+---
+
+## 12. Development Roadmap & Phase Status
 
 | Phase | Phase Name | Status |
 |---|---|---|
@@ -439,11 +497,12 @@ flowchart TD
 | **Phase 06** | Foundation Model Pretraining from Random Initialization | **Completed** |
 | **Phase 07** | Modular Intelligence Modules | **Completed** |
 | **Phase 08** | Multimodal Intelligence & Cross-Modal Fusion | **Completed** |
-| **Phase 09** | **Advanced Memory & Controlled Learning Architecture** | **Completed (Review Pending)** |
+| **Phase 09** | Advanced Memory & Controlled Learning Architecture | **Completed** |
+| **Phase 10** | **Personal AI Integration** | **Completed (Review Pending)** |
 
 ---
 
-## 12. Quickstart, Localhost Testing & Verification
+## 13. Quickstart, Localhost Testing & Verification
 
 ### Localhost Application Execution
 
@@ -470,17 +529,24 @@ cd frontend && npm start
 node frontend/server.js
 ```
 - **Local Dashboard:** [http://localhost:5173](http://localhost:5173)
-- **Features:** Warm neutral design, Light/Dark/System theme selector, Multimodal Studio view, and chat composer attachment tray for images, audio, video, and documents.
+- **Features:** Warm neutral design, Light/Dark/System theme selector, Multimodal Studio view, Memory & Controlled Continual Learning center, and Personal AI resident agent dashboard (hardware telemetry, process shields, file explorer, command advisor, approval ticket queue, and audit trail).
 
 ---
 
 ### Automated Tests & CLI Diagnostics
 
 ```bash
-# 1. Run complete automated test suite (247 tests) on CPU
+# 1. Run complete automated test suite (305 tests) on CPU
 .venv/bin/python -m pytest tests/
 
-# 2. Interact with the Unified Multimodal Engine via CLI
+# 2. Query Personal AI Agent via REST API
+curl -s http://127.0.0.1:8000/api/v1/personal-ai/system/summary | jq .
+curl -s http://127.0.0.1:8000/api/v1/personal-ai/processes/top | jq .
+curl -s -X POST http://127.0.0.1:8000/api/v1/personal-ai/terminal/advise \
+  -H "Content-Type: application/json" \
+  -d '{"command": "rm -rf /"}' | jq .
+
+# 3. Interact with the Unified Multimodal Engine via CLI
 .venv/bin/python scripts/run_multimodal.py --list-modalities
 .venv/bin/python scripts/run_multimodal.py --text "404 FOUNDERS is an enterprise AI assistant." --speech-tts
 .venv/bin/python scripts/run_multimodal.py --fuse --fuse-stage EARLY

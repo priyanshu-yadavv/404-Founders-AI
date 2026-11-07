@@ -721,4 +721,122 @@ Authored 4 comprehensive technical manuals in `docs/`:
   - `tests/learning/test_continual_learning.py` (3 tests)
   - `tests/api/test_memory_endpoints.py` (7 tests)
 - Executed entire test suite: **270 passed in 6.72s (100% success rate on CPU)**.
-- Staged all Phase 09 files awaiting user review and approval to commit.
+- Committed Phase 09 in commit `544ed6e` (`phase-09: implement advanced memory and controlled learning architecture`).
+
+---
+
+## [Phase 10] — 2026-11-07: Personal AI Integration
+
+### 1. Architectural Strategy & Design
+- Engineered a resident Personal AI Agent integrating 404 FOUNDERS directly with the local host workstation.
+- **Strict Invariants:**
+  - Localhost-only binding (`127.0.0.1`); never expose the local agent interface to external networks.
+  - Default operating mode is strictly `READ_ONLY`. All mutating, destructive, or privileged actions require explicit, one-time, expiring human operator approval tickets (300-second TTL).
+  - Zero fabricated hardware metrics: All hardware vitals (CPU load, memory usage, thermals, battery, disk, network) are read empirically from the operating system (`/proc`, `/sys`).
+  - Strict protected process shields: PIDs 0, 1, 2, `systemd`, `init`, `sshd`, `auditd`, and `kthreadd` are completely immune to termination attempts.
+  - Filesystem sandboxing: Read/write access strictly confined to the repository workspace with realpath verification (`os.path.realpath`) and automated sensitive file blocking (`/etc/shadow`, `~/.ssh/id_*`, `.env`). All read content is sanitized with `MemorySecurityManager.scrub_secrets()`.
+  - Voice biometric verification is explicitly isolated as an experimental prototype; voice input alone NEVER authorizes privileged or destructive operations.
+  - Immediate emergency kill switch instantly revokes all pending tickets and halts runtime execution.
+
+### 2. Implemented Subsystems & Modules
+- **OS Adapters & Telemetry (`personal_ai/os_adapters/`, `personal_ai/system_monitor/system_info.py`):**
+  - `OSAdapter` interface with `LinuxOSAdapter` and `WindowsOSAdapter`.
+  - Empirically parses `/proc/cpuinfo`, `/proc/meminfo`, `/proc/loadavg`, `/proc/uptime`, `/proc/net/dev`, `/sys/class/thermal`, and `/sys/class/power_supply` on Linux.
+  - `SystemInfoProvider` synthesizes normalized telemetry vitals and hardware specifications.
+- **Process Monitoring & Protection (`personal_ai/system_monitor/process_monitor.py`):**
+  - Enumerates active processes via `/proc/[pid]/stat` and `/proc/[pid]/cmdline`.
+  - Implements PID protection shields (`is_process_protected()`, `check_termination_permission()`) blocking termination requests targeting system daemons or low PIDs.
+  - Sorts top CPU and memory consumers and flags unprivileged anomalies.
+- **Sandboxed Filesystem Assistant (`personal_ai/filesystem/file_assistant.py`):**
+  - `FileSystemAssistant` enforces strict workspace confinement.
+  - Path traversal attempts (`../../etc/shadow`) raise `SecurityViolationError`.
+  - Sensitive files blocklist and automated credential scrubbing on file reads.
+- **Terminal Command Advisor (`personal_ai/terminal/command_advisor.py`):**
+  - `TerminalCommandAdvisor` analyzes shell commands and assigns one of 5 risk tiers: `READ_ONLY`, `LOW_RISK`, `SENSITIVE`, `DESTRUCTIVE`, `PRIVILEGED`.
+  - Permanently blocks hazardous commands (`rm -rf /`, fork bombs, raw disk writes, `curl | bash`, `chmod -R 777 /`).
+- **Application Manager (`personal_ai/apps/app_manager.py`):**
+  - Scans `/usr/share/applications` for `.desktop` entries.
+  - Launches approved applications only when supplied with a verified approval ticket (`TICK-...`).
+- **Network Diagnostics (`personal_ai/network_analysis/network_diagnostics.py`):**
+  - Inspects active network interfaces and IP addresses via `/proc/net/dev`.
+  - Tests connectivity using socket connection fallbacks to guarantee reliable operation in unprivileged sandbox environments without raw ICMP permissions.
+- **Repository Coding Assistant (`personal_ai/coding_assistant/repo_assistant.py`):**
+  - Parses AST syntax trees and reports functions, classes, and complexity metrics.
+  - Inspects git working directory status and diffs (`cached=True/False`).
+  - Executes isolated pytest runs with timeout guards.
+- **Defensive Cybersecurity Assistant (`personal_ai/cybersecurity/defense_assistant.py`):**
+  - Audits listening TCP ports via `/proc/net/tcp` without root dependencies.
+  - Maps ports to well-known services and generates defensive hardening advisories.
+- **Approval Ticket Manager (`personal_ai/permissions/approval_manager.py`):**
+  - Issues cryptographic single-use tickets (`TICK-...`) with a 300-second expiration window.
+  - Enforces atomic state transitions: `PENDING` $\to$ `APPROVED` $\to$ `CONSUMED` (or `REJECTED`, `EXPIRED`, `REVOKED`).
+- **Emergency Shutdown Controller (`personal_ai/emergency/kill_switch.py`):**
+  - Instant kill switch tripping immediately revokes all pending tickets and halts tool execution.
+  - Subsequent requests raise `EmergencyShutdownActiveError` until explicitly reset by an operator.
+- **Immutable Agent Audit Ledger (`personal_ai/audit/audit_system.py`):**
+  - Records all agent tool actions, approval grants, and shutdowns into the relational database `memory_audit_logs`.
+- **Multilingual Tool Router (`personal_ai/router.py`):**
+  - Intelligently maps user prompts in English, Devanagari Hindi, and Hinglish to appropriate tools and actions.
+- **Local Agent Runtime (`personal_ai/runtime.py`):**
+  - Enforces localhost binding (`127.0.0.1`), token generation (`PAI-...`), and session state management.
+- **Voice Assistant Foundation (`personal_ai/voice/voice_interface.py`):**
+  - Wake-word detection ("hey founders", "founders"), audio streaming hooks, session interrupt, and experimental speaker verification prototype with explicit safety warnings.
+- **Personal AI Controller (`personal_ai/controller.py`):**
+  - Top-level unified orchestrator uniting runtime, approvals, file system, process manager, apps, network, git assistant, and security posture.
+
+### 3. REST API & Endpoint Additions
+- Added 26 endpoints under `/api/v1/personal-ai/` in `api/rest/routes.py`, `schemas.py`, and `app.py`:
+  - `GET /api/v1/personal-ai/status`: Runtime status and localhost binding check.
+  - `POST /api/v1/personal-ai/session`: Session initialization.
+  - `POST /api/v1/personal-ai/chat`: Multilingual command processing and tool routing.
+  - `GET /api/v1/personal-ai/system/summary`: Real-time system telemetry and OS information.
+  - `GET /api/v1/personal-ai/system/hardware`: Detailed hardware specification.
+  - `GET /api/v1/personal-ai/system/cpu`: Core-level CPU vitals.
+  - `GET /api/v1/personal-ai/system/memory`: RAM and swap vitals.
+  - `GET /api/v1/personal-ai/system/battery`: Battery health and charging status.
+  - `GET /api/v1/personal-ai/processes`: Active process enumeration.
+  - `GET /api/v1/personal-ai/processes/top`: Top CPU and memory consumer sorting.
+  - `POST /api/v1/personal-ai/processes/terminate`: Protected process termination (requires ticket).
+  - `GET /api/v1/personal-ai/filesystem/list`: Workspace file listing with safety filters.
+  - `POST /api/v1/personal-ai/filesystem/read`: Safe file reading with secret scrubbing.
+  - `POST /api/v1/personal-ai/filesystem/write`: Approval-gated file writing.
+  - `POST /api/v1/personal-ai/terminal/advise`: Shell command risk analysis.
+  - `GET /api/v1/personal-ai/apps`: Installed desktop application list.
+  - `POST /api/v1/personal-ai/apps/launch`: Application launch (requires ticket).
+  - `GET /api/v1/personal-ai/network/interfaces`: Network interface details.
+  - `POST /api/v1/personal-ai/network/connectivity`: Safe latency and connectivity testing.
+  - `GET /api/v1/personal-ai/coding/git-status`: Repository git status.
+  - `GET /api/v1/personal-ai/coding/git-diff`: Repository git diff.
+  - `GET /api/v1/personal-ai/security/posture`: Listening ports and defensive posture audit.
+  - `GET /api/v1/personal-ai/approvals/pending`: List pending approval tickets.
+  - `POST /api/v1/personal-ai/approvals/{ticket_id}/decision`: Approve or reject tickets.
+  - `GET /api/v1/personal-ai/audit/logs`: Immutable agent audit ledger.
+  - `POST /api/v1/personal-ai/emergency/shutdown` & `reset`: Kill-switch triggering and reset.
+
+### 4. Warm Neutral Frontend Integration
+- Redesigned `#view-personal-ai` in `frontend/public/index.html` and `frontend/public/app.js`:
+  - **Emergency Stop Bar:** Live status indicator, emergency shutdown trigger, and resume controls.
+  - **Multilingual Command Composer:** Natural-language chat box with quick action chips (Telemetry, Vitals, Processes, Security Posture, Git Status, Advise Command) supporting English, Hindi, and Hinglish.
+  - **Live Hardware Telemetry:** Gauges for CPU utilization, RAM usage, load average, and active OS kernel.
+  - **Process Management Table:** Enumeration of processes with PID protection shields and kill-ticket triggers.
+  - **Sandboxed File Explorer:** Safe workspace directory navigation and file reading with secret scrubbing badge.
+  - **Terminal Command Advisor Simulator:** Real-time command risk assessment with colored safety tags and risk explanations.
+  - **Pending Approvals Queue:** Interactive approval/rejection cards for pending privileged operations with 300s expiration timer.
+  - **Immutable Audit Trail:** Real-time table of recent agent actions, execution results, and security timestamps.
+
+### 5. Documentation Authored
+Authored 4 comprehensive technical manuals in `docs/`:
+- [`docs/PERSONAL_AI_ARCHITECTURE.md`](docs/PERSONAL_AI_ARCHITECTURE.md) (`DOC-PAI-001`)
+- [`docs/LOCAL_AGENT_RUNTIME.md`](docs/LOCAL_AGENT_RUNTIME.md) (`DOC-PAI-002`)
+- [`docs/PERSONAL_AI_SECURITY_PERMISSIONS.md`](docs/PERSONAL_AI_SECURITY_PERMISSIONS.md) (`DOC-PAI-003`)
+- [`docs/PERSONAL_AI_VOICE_FOUNDATION.md`](docs/PERSONAL_AI_VOICE_FOUNDATION.md) (`DOC-PAI-004`)
+
+### 6. Automated Testing & Verification
+- Authored 35 new tests across 5 test modules:
+  - `tests/personal_ai/test_os_adapters_and_system_info.py` (6 tests)
+  - `tests/personal_ai/test_filesystem_and_terminal_advisor.py` (6 tests)
+  - `tests/personal_ai/test_agent_security_and_approval.py` (6 tests)
+  - `tests/personal_ai/test_voice_and_coding_assistant.py` (5 tests)
+  - `tests/api/test_personal_ai_endpoints.py` (12 tests)
+- Executed entire test suite: **305 passed in 13.02s (100% success rate on CPU)**.
+- Staged all Phase 10 files awaiting user review and approval to commit.

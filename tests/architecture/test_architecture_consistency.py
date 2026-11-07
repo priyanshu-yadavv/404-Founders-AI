@@ -75,6 +75,14 @@ EXPECTED_PACKAGES = [
     "personal_ai.cybersecurity",
     "personal_ai.network_analysis",
     "personal_ai.automation",
+    "personal_ai.os_adapters",
+    "personal_ai.filesystem",
+    "personal_ai.apps",
+    "personal_ai.terminal",
+    "personal_ai.permissions",
+    "personal_ai.emergency",
+    "personal_ai.audit",
+    "personal_ai.voice",
     "agent",
     "agent.planner",
     "agent.tools",
@@ -154,6 +162,9 @@ EXPECTED_DOCS = [
     "docs/MEMORY_RETRIEVAL_CONSOLIDATION.md",
     "docs/CONTINUAL_LEARNING_PIPELINE.md",
     "docs/MEMORY_PRIVACY_SECURITY.md",
+    "docs/LOCAL_AGENT_RUNTIME.md",
+    "docs/PERSONAL_AI_SECURITY_PERMISSIONS.md",
+    "docs/PERSONAL_AI_VOICE_FOUNDATION.md",
 ]
 
 

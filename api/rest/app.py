@@ -32,6 +32,8 @@ from memory.user_preferences import UserPreferenceMemory
 from memory.working_memory import WorkingMemory
 from multimodal.modality_router import ModalityRouter
 from neural_architecture.inference import InferenceEngine
+from personal_ai.controller import PersonalAIController
+from personal_ai.memory_bridge import PersonalAIMemoryBridge
 from tokenizer import CustomBPETokenizer
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -82,6 +84,17 @@ def initialize_runtime_services() -> Dict[str, Any]:
     feedback_sys = FeedbackSystem(db_mgr)
     learning_pipe = ControlledLearningPipeline(db_manager=db_mgr, feedback_sys=feedback_sys)
 
+    # Phase 10 — Personal AI Subsystems
+    personal_ai_ctrl = PersonalAIController(
+        memory_bridge=PersonalAIMemoryBridge(
+            db_manager=db_mgr,
+            pref_memory=pref_mem,
+            episodic_memory=episodic_mem,
+            long_term_memory=long_term_mem,
+            working_memory=working_mem,
+        )
+    )
+
     return {
         "tokenizer": tokenizer,
         "neural_model": neural_model,
@@ -101,6 +114,11 @@ def initialize_runtime_services() -> Dict[str, Any]:
         "contextual_memory": contextual_mem,
         "feedback_system": feedback_sys,
         "learning_pipeline": learning_pipe,
+        "personal_ai_controller": personal_ai_ctrl,
+        "agent_runtime": personal_ai_ctrl.runtime,
+        "approval_manager": personal_ai_ctrl.approval_mgr,
+        "emergency_controller": personal_ai_ctrl.emergency_ctrl,
+        "agent_audit_system": personal_ai_ctrl.audit,
         "start_time": time.time(),
     }
 
