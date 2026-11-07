@@ -44,6 +44,10 @@
               <svg viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
               <span>Coding Workspace</span>
             </li>
+            <li class="nav-item" data-view="multimodal">
+              <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+              <span>Multimodal Studio</span>
+            </li>
             <li class="nav-item" data-view="cybersecurity">
               <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
               <span>Cybersecurity Audit</span>
@@ -93,6 +97,14 @@
           <p id="viewSubtitle">Autoregressive neural inference on custom foundation architecture</p>
         </div>
         <div class="topbar-actions">
+          <div class="theme-select-container">
+            <label for="themeSelect">Theme:</label>
+            <select id="themeSelect" class="theme-dropdown">
+              <option value="light">Warm Light</option>
+              <option value="dark">Warm Dark</option>
+              <option value="system">System</option>
+            </select>
+          </div>
           <span class="badge-outline" id="badgeMode">HYBRID MODE</span>
           <span class="badge-outline" id="badgeBudget">SAFE BUDGET: 3.50 GB</span>
         </div>
@@ -130,28 +142,38 @@
 
             <!-- Composer -->
             <div class="chat-composer">
+              <!-- Multimodal Attachment Tray -->
+              <div id="composerAttachmentTray" class="composer-attachment-tray" style="display: none;"></div>
+
               <textarea 
                 id="composerText" 
                 class="composer-textarea" 
-                placeholder="Type a prompt to run through the neural core forward pass..."
+                placeholder="Type a prompt or attach image, audio, video, or document..."
                 rows="2"
               ></textarea>
               <div class="composer-toolbar">
                 <div class="composer-options">
-                  <label>
-                    <span>Mode:</span>
-                    <select id="composerMode">
-                      <option value="general">General Intelligence</option>
-                      <option value="personal">Personal AI</option>
-                    </select>
+                  <!-- Hidden File Inputs -->
+                  <input type="file" id="attachImageInput" accept=".png,.jpg,.jpeg,.webp,.bmp" style="display:none;" />
+                  <input type="file" id="attachAudioInput" accept=".wav,.mp3,.flac,.ogg,.m4a" style="display:none;" />
+                  <input type="file" id="attachVideoInput" accept=".mp4,.mov,.webm" style="display:none;" />
+                  <input type="file" id="attachDocInput" accept=".pdf,.docx,.csv,.json,.txt,.md" style="display:none;" />
+
+                  <button type="button" class="media-upload-btn" id="btnAttachImage" title="Attach Image">📷 Image</button>
+                  <button type="button" class="media-upload-btn" id="btnAttachAudio" title="Attach Audio">🎙️ Audio</button>
+                  <button type="button" class="media-upload-btn" id="btnAttachVideo" title="Attach Video">🎬 Video</button>
+                  <button type="button" class="media-upload-btn" id="btnAttachDoc" title="Attach Document">📄 Doc</button>
+
+                  <label style="margin-left: 6px;">
+                    <input type="checkbox" id="chkMultimodalFusion" checked />
+                    <span style="font-size: 11.5px;">Fusion</span>
                   </label>
                   <label>
-                    <span>Tokens:</span>
-                    <input type="range" id="composerTokensSlider" min="1" max="20" value="6" />
-                    <span id="composerTokensVal" style="font-family: var(--font-mono); font-size: 11px;">6</span>
+                    <input type="checkbox" id="chkSpeechTTS" />
+                    <span style="font-size: 11.5px;">TTS</span>
                   </label>
                 </div>
-                <button id="btnChatSend" class="btn-primary">Generate Next Tokens</button>
+                <button id="btnChatSend" class="btn-primary">Execute Multimodal Query</button>
               </div>
             </div>
           </div>
@@ -584,6 +606,232 @@ State: Clean initialization, zero persistent leak detected.
                 </div>
                 <span class="endpoint-desc">Local Git Repository Status</span>
               </a>
+            </div>
+          </div>
+        </section>
+
+        <!-- View 8: Multimodal Intelligence Studio -->
+        <section id="view-multimodal" class="view-panel">
+          <div class="card" style="margin-bottom: 20px;">
+            <div class="card-header">
+              <h3>Unified Multimodal Intelligence (Phase 08)</h3>
+              <span class="card-tag">Vision • Audio/Speech • Video • Documents • Fusion</span>
+            </div>
+            <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.5;">
+              Phase 08 establishes a unified cross-modal architecture operating across text, vision, audio waveforms, spoken utterances, video streams, and structured enterprise documents. Modalities are processed through deterministic feature extractors, sanitized against adversarial injection, and fused via Early (modality embedding), Intermediate (cross-modal attention), and Late (adaptive gating) fusion layers.
+            </p>
+            <div class="chip-row">
+              <span class="preset-chip active" id="tabBtnVision" onclick="switchMultimodalTab('vision')">Image Intelligence</span>
+              <span class="preset-chip" id="tabBtnAudio" onclick="switchMultimodalTab('audio')">Audio & Speech</span>
+              <span class="preset-chip" id="tabBtnVideo" onclick="switchMultimodalTab('video')">Video Intelligence</span>
+              <span class="preset-chip" id="tabBtnDoc" onclick="switchMultimodalTab('doc')">Document Intelligence</span>
+              <span class="preset-chip" id="tabBtnFusion" onclick="switchMultimodalTab('fusion')">Multimodal Fusion</span>
+            </div>
+          </div>
+
+          <!-- Tab 1: Image Intelligence -->
+          <div id="mmodalTabVision" class="multimodal-subtab active">
+            <div class="section-grid">
+              <div class="card">
+                <div class="card-header">
+                  <h3>Vision Inspection & Patch Analysis</h3>
+                  <span class="card-tag">ViT 16x16 Patches</span>
+                </div>
+                <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px;">
+                  Supports PNG, JPEG, WEBP, and BMP with magic-byte validation and decompression-bomb protection. Converts images to 224x224 and extracts 196 ViT patches (768-dim embeddings).
+                </p>
+                <div class="form-group" style="margin-bottom: 12px;">
+                  <label class="form-label">Upload Image File</label>
+                  <input type="file" id="imageStudioFileInput" accept="image/png,image/jpeg,image/webp,image/bmp" class="form-input" style="padding: 6px;" />
+                </div>
+                <div class="button-bar">
+                  <button id="btnRunImageAnalysis" class="btn-primary">Analyze Image</button>
+                  <button id="btnLoadSampleImage" class="btn-secondary">Load Sample Image</button>
+                </div>
+                <div id="imagePreviewContainer" style="margin-top: 14px; text-align: center; display: none;">
+                  <img id="imagePreviewImg" style="max-width: 100%; max-height: 220px; border-radius: var(--radius-sm); border: 1px solid var(--border);" alt="Preview" />
+                </div>
+              </div>
+
+              <div class="card">
+                <div class="card-header">
+                  <h3>Vision Analysis Report</h3>
+                  <span class="card-tag" id="imageStatusTag">Ready</span>
+                </div>
+                <div class="kv-list" id="imageKvList">
+                  <div class="kv-item"><span class="kv-key">Format & Magic Bytes</span><span class="kv-val" id="imgResFormat">-</span></div>
+                  <div class="kv-item"><span class="kv-key">Native Resolution</span><span class="kv-val" id="imgResResolution">-</span></div>
+                  <div class="kv-item"><span class="kv-key">Aspect Ratio</span><span class="kv-val" id="imgResAspect">-</span></div>
+                  <div class="kv-item"><span class="kv-key">Channels</span><span class="kv-val" id="imgResChannels">-</span></div>
+                  <div class="kv-item"><span class="kv-key">ViT 16x16 Patches</span><span class="kv-val accent" id="imgResPatches">-</span></div>
+                </div>
+                <div style="margin-top: 14px;">
+                  <label class="form-label">Caption / Visual Hypothesis</label>
+                  <div class="output-container" id="imageCaptionBox" style="min-height: 60px;">No image analyzed yet.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab 2: Audio & Speech -->
+          <div id="mmodalTabAudio" class="multimodal-subtab" style="display: none;">
+            <div class="section-grid">
+              <div class="card">
+                <div class="card-header">
+                  <h3>Audio Processing & STT</h3>
+                  <span class="card-tag">WAV • STFT • Energy VAD</span>
+                </div>
+                <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px;">
+                  Parses audio waveforms, computes STFT spectrograms, energy metrics (RMS, SNR), and extracts timestamped speech segments for English and Hindi.
+                </p>
+                <div class="form-group" style="margin-bottom: 12px;">
+                  <label class="form-label">Upload Audio File (WAV, MP3, FLAC, OGG)</label>
+                  <input type="file" id="audioStudioFileInput" accept="audio/*" class="form-input" style="padding: 6px;" />
+                </div>
+                <div class="button-bar">
+                  <button id="btnRunAudioAnalysis" class="btn-primary">Inspect Spectrogram</button>
+                  <button id="btnRunSpeechSTT" class="btn-secondary">Transcribe Speech (STT)</button>
+                </div>
+                <div class="output-container" id="audioResultsBox" style="margin-top: 14px; min-height: 100px;">
+                  Select an audio file or click transcribe.
+                </div>
+              </div>
+
+              <div class="card">
+                <div class="card-header">
+                  <h3>Speech Generation (TTS)</h3>
+                  <span class="card-tag">Acoustic Formant Synthesizer</span>
+                </div>
+                <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px;">
+                  Deterministic vocal-tract formant synthesis producing playable 16-bit PCM mono WAV audio for English and Hindi without cloud dependency.
+                </p>
+                <div class="form-group" style="margin-bottom: 10px;">
+                  <label class="form-label">Spoken Text</label>
+                  <textarea id="ttsTextInput" class="text-area" rows="2">404 FOUNDERS: Intelligence Without Boundaries.</textarea>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                  <div>
+                    <label class="form-label">Language</label>
+                    <select id="ttsLangSelect" class="form-input">
+                      <option value="en">English</option>
+                      <option value="hi">Hindi (नमस्ते)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="form-label">Pitch (Hz)</label>
+                    <input type="number" id="ttsPitchInput" class="form-input" value="220" min="100" max="450" />
+                  </div>
+                </div>
+                <div class="button-bar">
+                  <button id="btnRunSpeechTTS" class="btn-primary">Synthesize Spoken Audio</button>
+                </div>
+                <div style="margin-top: 14px;">
+                  <audio id="ttsAudioPlayer" controls style="width: 100%; display: none; margin-bottom: 8px;"></audio>
+                  <div class="output-container" id="ttsStatusBox" style="min-height: 50px;">Synthesizer ready.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab 3: Video Intelligence -->
+          <div id="mmodalTabVideo" class="multimodal-subtab" style="display: none;">
+            <div class="card">
+              <div class="card-header">
+                <h3>Bounded Video Stream & Keyframe Extraction</h3>
+                <span class="card-tag">OpenCV Streaming • Chi-Square Keyframes</span>
+              </div>
+              <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px;">
+                Processes MP4, MOV, and WEBM videos with memory bounding (streaming frame decoder, never loading uncompressed video into RAM). Identifies scene transitions via color histogram Chi-Square differences.
+              </p>
+              <div class="form-group" style="margin-bottom: 12px;">
+                <label class="form-label">Upload Video File</label>
+                <input type="file" id="videoStudioFileInput" accept="video/mp4,video/webm,video/quicktime" class="form-input" style="padding: 6px;" />
+              </div>
+              <div class="button-bar">
+                <button id="btnRunVideoAnalysis" class="btn-primary">Analyze Video & Extract Keyframes</button>
+              </div>
+              <div id="videoResultsContainer" style="margin-top: 16px;">
+                <div class="output-container" id="videoSummaryBox">No video analyzed yet.</div>
+                <div id="videoKeyframeStrip" class="keyframe-strip" style="margin-top: 14px; display: none;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab 4: Document Intelligence -->
+          <div id="mmodalTabDoc" class="multimodal-subtab" style="display: none;">
+            <div class="section-grid">
+              <div class="card">
+                <div class="card-header">
+                  <h3>Document Extraction & Prompt Injection Defense</h3>
+                  <span class="card-tag">PDF • DOCX • CSV • JSON • Markdown</span>
+                </div>
+                <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px;">
+                  Extracts structured text and tabular data from documents, performs semantic chunking, and passes content through the <code>inspect_prompt_safety</code> defense scanner to detect jailbreaks, prompt injections, and system prompt override attempts.
+                </p>
+                <div class="form-group" style="margin-bottom: 12px;">
+                  <label class="form-label">Upload Document File</label>
+                  <input type="file" id="docStudioFileInput" accept=".pdf,.docx,.csv,.json,.txt,.md" class="form-input" style="padding: 6px;" />
+                </div>
+                <div class="button-bar">
+                  <button id="btnRunDocAnalysis" class="btn-primary">Parse & Audit Document</button>
+                </div>
+                <div id="docPreviewBox" class="output-container" style="margin-top: 14px; max-height: 180px;">
+                  Select a document to inspect text and audit safety.
+                </div>
+              </div>
+
+              <div class="card">
+                <div class="card-header">
+                  <h3>Document Security & Content Audit</h3>
+                  <span class="card-tag" id="docSafetyBadge">Pending</span>
+                </div>
+                <div class="kv-list" id="docKvList">
+                  <div class="kv-item"><span class="kv-key">Detected Format</span><span class="kv-val" id="docResFormat">-</span></div>
+                  <div class="kv-item"><span class="kv-key">Page / Section Count</span><span class="kv-val" id="docResPages">-</span></div>
+                  <div class="kv-item"><span class="kv-key">Word Count</span><span class="kv-val" id="docResWords">-</span></div>
+                  <div class="kv-item"><span class="kv-key">Semantic Chunks</span><span class="kv-val" id="docResChunks">-</span></div>
+                  <div class="kv-item"><span class="kv-key">Tables Detected</span><span class="kv-val" id="docResTables">-</span></div>
+                  <div class="kv-item"><span class="kv-key">Injection Defense Status</span><span class="kv-val accent" id="docResSecurity">-</span></div>
+                </div>
+                <div style="margin-top: 14px;">
+                  <label class="form-label">Audit Notes & Extracted Tables</label>
+                  <div class="output-container" id="docDetailsBox" style="min-height: 80px;">No document parsed yet.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab 5: Multimodal Fusion -->
+          <div id="mmodalTabFusion" class="multimodal-subtab" style="display: none;">
+            <div class="card">
+              <div class="card-header">
+                <h3>Multi-Stage Multimodal Fusion Engine</h3>
+                <span class="card-tag">Early • Intermediate • Late Fusion</span>
+              </div>
+              <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 14px; line-height: 1.5;">
+                Select active modalities and the fusion mechanism. Early fusion unifies modality tokens via type embeddings; Intermediate fusion uses multi-head cross-attention with LayerScale; Late fusion employs an adaptive softmax gating aggregator.
+              </p>
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 16px;">
+                <div>
+                  <label class="form-label" style="font-weight: 600; margin-bottom: 8px;">Active Modalities</label>
+                  <label style="display: block; font-size: 12.5px; margin-bottom: 6px;"><input type="checkbox" id="fuseModText" checked /> TEXT (Tokens)</label>
+                  <label style="display: block; font-size: 12.5px; margin-bottom: 6px;"><input type="checkbox" id="fuseModImage" checked /> IMAGE (ViT Patches)</label>
+                  <label style="display: block; font-size: 12.5px; margin-bottom: 6px;"><input type="checkbox" id="fuseModAudio" checked /> AUDIO (Spectrogram)</label>
+                  <label style="display: block; font-size: 12.5px; margin-bottom: 6px;"><input type="checkbox" id="fuseModVideo" /> VIDEO (Keyframes)</label>
+                </div>
+                <div>
+                  <label class="form-label" style="font-weight: 600; margin-bottom: 8px;">Fusion Mechanism</label>
+                  <label style="display: block; font-size: 12.5px; margin-bottom: 6px;"><input type="radio" name="fusionStageRadio" value="EARLY" checked /> EARLY (Token Concatenation + Modality Embedding)</label>
+                  <label style="display: block; font-size: 12.5px; margin-bottom: 6px;"><input type="radio" name="fusionStageRadio" value="INTERMEDIATE" /> INTERMEDIATE (Cross-Modal Attention + LayerScale)</label>
+                  <label style="display: block; font-size: 12.5px; margin-bottom: 6px;"><input type="radio" name="fusionStageRadio" value="LATE" /> LATE (Adaptive Softmax Gating)</label>
+                </div>
+              </div>
+              <div class="button-bar">
+                <button id="btnRunFusionExecution" class="btn-primary">Execute Multimodal Fusion</button>
+              </div>
+              <div class="output-container" id="fusionResultsBox" style="margin-top: 14px; min-height: 90px;">
+                Configure modalities and click "Execute Multimodal Fusion" to test tensor generation.
+              </div>
             </div>
           </div>
         </section>

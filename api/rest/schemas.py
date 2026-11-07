@@ -6,7 +6,7 @@ tokenizer operations, neural core inference, and security validation.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from pydantic import BaseModel, Field
 
 
@@ -262,3 +262,139 @@ class SelfEvaluationResponse(BaseModel):
     contains_contradictions: bool
     missing_elements: List[str]
     summary: str
+
+
+# ==========================================
+# PHASE 08 — Multimodal Intelligence Schemas
+# ==========================================
+
+class MultimodalProcessRequest(BaseModel):
+    """Unified multimodal analysis request supporting text, image, audio, video, and documents."""
+    text: Optional[str] = Field(None, description="Prompt text or question")
+    image_base64: Optional[str] = Field(None, description="Base64-encoded image (PNG, JPEG, WEBP, BMP)")
+    audio_base64: Optional[str] = Field(None, description="Base64-encoded audio (WAV, MP3, FLAC, OGG)")
+    video_base64: Optional[str] = Field(None, description="Base64-encoded video (MP4, WEBM, MOV)")
+    document_base64: Optional[str] = Field(None, description="Base64-encoded document (PDF, DOCX, CSV, JSON, TXT, MD)")
+    filename_hints: Optional[Dict[str, str]] = Field(default_factory=dict, description="Filename or MIME hints")
+    perform_fusion: bool = Field(True, description="Whether to execute multi-stage multimodal fusion")
+    fusion_stage: str = Field("EARLY", description="Fusion stage: EARLY, INTERMEDIATE, or LATE")
+    synthesize_speech: bool = Field(False, description="Generate spoken audio response (TTS)")
+
+
+class MultimodalProcessResponse(BaseModel):
+    """Consolidated multimodal analysis response."""
+    primary_modality: str
+    active_modalities: List[str]
+    is_multimodal: bool
+    text_summary: Optional[str] = None
+    image_caption: Optional[str] = None
+    audio_summary: Optional[str] = None
+    speech_transcript: Optional[str] = None
+    speech_audio_base64_uri: Optional[str] = None
+    video_summary: Optional[str] = None
+    document_summary: Optional[str] = None
+    document_safe: Optional[bool] = None
+    fusion_active_modalities: Optional[List[str]] = None
+    combined_summary: str
+
+
+class ImageProcessRequest(BaseModel):
+    """Image intelligence inspection request."""
+    image_base64: str = Field(..., min_length=16, description="Base64-encoded image payload")
+    target_size: Optional[Tuple[int, int]] = Field((224, 224), description="Target spatial resolution")
+
+
+class ImageProcessResponse(BaseModel):
+    """Image intelligence analysis result."""
+    format: str
+    width: int
+    height: int
+    aspect_ratio: float
+    channels: int
+    patch_count: int
+    caption: str
+    reasoning_summary: str
+
+
+class AudioProcessRequest(BaseModel):
+    """Audio intelligence inspection request."""
+    audio_base64: str = Field(..., min_length=16, description="Base64-encoded audio payload")
+
+
+class AudioProcessResponse(BaseModel):
+    """Audio intelligence analysis result."""
+    format: str
+    duration_seconds: float
+    sample_rate: int
+    channels: int
+    rms_energy: float
+    estimated_snr_db: float
+    is_silent: bool
+    summary: str
+
+
+class SpeechRecognizeRequest(BaseModel):
+    """Speech-to-text recognition request."""
+    audio_base64: str = Field(..., min_length=16, description="Base64-encoded speech audio payload")
+    language_hint: Optional[str] = Field("en", description="Optional language code (en, hi)")
+
+
+class SpeechRecognizeResponse(BaseModel):
+    """Speech-to-text transcription result."""
+    full_transcript: str
+    detected_language: str
+    overall_confidence: float
+    duration_seconds: float
+    segments_count: int
+
+
+class SpeechSynthesizeRequest(BaseModel):
+    """Text-to-speech synthesis request."""
+    text: str = Field(..., min_length=1, description="Text string to synthesize into spoken audio")
+    language: str = Field("en", description="Target language (en, hi)")
+    voice_id: str = Field("default_neutral", description="Voice profile identifier")
+    speed_factor: float = Field(1.0, ge=0.5, le=2.0, description="Playback speed multiplier")
+    pitch_hz: float = Field(220.0, ge=100.0, le=450.0, description="Baseline vocal pitch frequency")
+
+
+class SpeechSynthesizeResponse(BaseModel):
+    """Text-to-speech audio result."""
+    text: str
+    language: str
+    duration_seconds: float
+    sample_rate: int
+    audio_base64_uri: str
+    summary: str
+
+
+class DocumentProcessRequest(BaseModel):
+    """Document intelligence extraction request."""
+    document_base64: str = Field(..., min_length=4, description="Base64-encoded document payload")
+    filename: str = Field(..., min_length=1, description="Original filename with extension (.pdf, .docx, .csv, etc.)")
+
+
+class DocumentProcessResponse(BaseModel):
+    """Document intelligence analysis result."""
+    format: str
+    page_count: int
+    word_count: int
+    chunks_count: int
+    has_tables: bool
+    is_safe: bool
+    detected_injection_risks: List[str]
+    summary: str
+
+
+class MultimodalFuseRequest(BaseModel):
+    """Multimodal fusion tensor synthesis request."""
+    active_modalities: List[str] = Field(..., min_length=1, description="Modalities to fuse (TEXT, IMAGE, AUDIO, VIDEO)")
+    fusion_stage: str = Field("EARLY", description="Fusion stage: EARLY, INTERMEDIATE, or LATE")
+
+
+class MultimodalFuseResponse(BaseModel):
+    """Multimodal fusion tensor result."""
+    fusion_stage: str
+    active_modalities: List[str]
+    missing_modalities: List[str]
+    fused_tensor_shape: List[int]
+    modality_weights: Dict[str, float]

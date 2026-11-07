@@ -35,12 +35,51 @@ const viewMetadata = {
   api: {
     title: 'API Specifications & Interactive Docs',
     subtitle: 'FastAPI OpenAPI 3.1.0 interactive documentation and verification endpoints'
+  },
+  multimodal: {
+    title: 'Multimodal Intelligence Studio',
+    subtitle: 'Cross-modal processing for text, vision, audio, video, and documents'
   }
 };
 
 // State
 let lastEncodedIds = [];
 let isBackendOnline = false;
+
+// Multimodal Attachments State
+const activeAttachments = {
+  image: null,
+  audio: null,
+  video: null,
+  doc: null
+};
+
+// -------------------------------------------------------------------------
+// Theme Switcher & System Preference Sync
+// -------------------------------------------------------------------------
+
+function initThemeSwitcher() {
+  const themeSelect = document.getElementById('themeSelect');
+  if (!themeSelect) return;
+  const saved = localStorage.getItem('404_founders_theme') || 'light';
+  themeSelect.value = saved;
+  applyTheme(saved);
+
+  themeSelect.addEventListener('change', (e) => {
+    const val = e.target.value;
+    localStorage.setItem('404_founders_theme', val);
+    applyTheme(val);
+  });
+}
+
+function applyTheme(theme) {
+  if (theme === 'system') {
+    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+  } else {
+    document.documentElement.setAttribute('data-theme', theme);
+  }
+}
 
 // -------------------------------------------------------------------------
 // Navigation & View Switching
@@ -127,12 +166,6 @@ async function checkHealth() {
 function initChat() {
   const btnSend = document.getElementById('btnChatSend');
   const composerText = document.getElementById('composerText');
-  const slider = document.getElementById('composerTokensSlider');
-  const sliderVal = document.getElementById('composerTokensVal');
-
-  slider.addEventListener('input', (e) => {
-    sliderVal.textContent = e.target.value;
-  });
 
   // Keyboard shortcut: Ctrl+Enter or Cmd+Enter to send
   composerText.addEventListener('keydown', (e) => {
@@ -143,39 +176,123 @@ function initChat() {
   });
 
   btnSend.addEventListener('click', sendChatMessage);
+
+  // File upload buttons
+  const btnAttachImage = document.getElementById('btnAttachImage');
+  const inputAttachImage = document.getElementById('attachImageInput');
+  const btnAttachAudio = document.getElementById('btnAttachAudio');
+  const inputAttachAudio = document.getElementById('attachAudioInput');
+  const btnAttachVideo = document.getElementById('btnAttachVideo');
+  const inputAttachVideo = document.getElementById('attachVideoInput');
+  const btnAttachDoc = document.getElementById('btnAttachDoc');
+  const inputAttachDoc = document.getElementById('attachDocInput');
+
+  if (btnAttachImage && inputAttachImage) {
+    btnAttachImage.addEventListener('click', () => inputAttachImage.click());
+    inputAttachImage.addEventListener('change', (e) => handleFileAttach(e, 'image', '📷'));
+  }
+  if (btnAttachAudio && inputAttachAudio) {
+    btnAttachAudio.addEventListener('click', () => inputAttachAudio.click());
+    inputAttachAudio.addEventListener('change', (e) => handleFileAttach(e, 'audio', '🎙️'));
+  }
+  if (btnAttachVideo && inputAttachVideo) {
+    btnAttachVideo.addEventListener('click', () => inputAttachVideo.click());
+    inputAttachVideo.addEventListener('change', (e) => handleFileAttach(e, 'video', '🎬'));
+  }
+  if (btnAttachDoc && inputAttachDoc) {
+    btnAttachDoc.addEventListener('click', () => inputAttachDoc.click());
+    inputAttachDoc.addEventListener('change', (e) => handleFileAttach(e, 'doc', '📄'));
+  }
 }
+
+function handleFileAttach(e, type, icon) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (loadEvent) => {
+    const dataUri = loadEvent.target.result;
+    const base64Data = dataUri.split(',')[1] || dataUri;
+    activeAttachments[type] = {
+      name: file.name,
+      size: file.size,
+      mime: file.type,
+      data: base64Data,
+      icon: icon
+    };
+    renderAttachmentTray();
+  };
+  reader.readAsDataURL(file);
+}
+
+function renderAttachmentTray() {
+  const tray = document.getElementById('composerAttachmentTray');
+  if (!tray) return;
+  const keys = Object.keys(activeAttachments).filter(k => activeAttachments[k] !== null);
+  if (keys.length === 0) {
+    tray.style.display = 'none';
+    tray.innerHTML = '';
+    return;
+  }
+  tray.style.display = 'flex';
+  tray.innerHTML = keys.map(k => {
+    const item = activeAttachments[k];
+    return `
+      <div class="composer-attachment-pill">
+        <span>${item.icon} ${escapeHtml(item.name)}</span>
+        <span class="remove-btn" onclick="removeAttachment('${k}')">&times;</span>
+      </div>
+    `;
+  }).join('');
+}
+
+window.removeAttachment = function(type) {
+  activeAttachments[type] = null;
+  const inputEl = document.getElementById(`attach${type.charAt(0).toUpperCase() + type.slice(1)}Input`);
+  if (inputEl) inputEl.value = '';
+  renderAttachmentTray();
+};
 
 async function sendChatMessage() {
   const composerText = document.getElementById('composerText');
   const prompt = composerText.value.trim();
-  if (!prompt) return;
+  const hasAttachments = Object.values(activeAttachments).some(v => v !== null);
 
-  const mode = document.getElementById('composerMode').value;
-  const maxTokens = parseInt(document.getElementById('composerTokensSlider').value, 10);
+  if (!prompt && !hasAttachments) return;
+
   const chatThread = document.getElementById('chatThread');
   const btnSend = document.getElementById('btnChatSend');
+  const chkFusion = document.getElementById('chkMultimodalFusion');
+  const chkTTS = document.getElementById('chkSpeechTTS');
+  const isMultimodalQuery = hasAttachments || (chkFusion && chkFusion.checked);
 
-  // Append user message
+  // Render user message
   const userMsgEl = document.createElement('div');
   userMsgEl.className = 'message-item user';
+
+  let attachedBadges = '';
+  for (const [k, v] of Object.entries(activeAttachments)) {
+    if (v) attachedBadges += `<span class="badge-outline" style="margin-right: 4px;">${v.icon} ${escapeHtml(v.name)}</span>`;
+  }
+
   userMsgEl.innerHTML = `
-    <div class="message-sender">User &bull; ${escapeHtml(mode.toUpperCase())}</div>
-    <div class="message-bubble">${escapeHtml(prompt)}</div>
+    <div class="message-sender">User &bull; ${hasAttachments ? 'Multimodal Payload' : 'Interactive Query'}</div>
+    ${attachedBadges ? `<div style="margin-bottom: 6px;">${attachedBadges}</div>` : ''}
+    <div class="message-bubble">${escapeHtml(prompt || '(Attached media payload)')}</div>
   `;
   chatThread.appendChild(userMsgEl);
 
   // Clear composer & disable send button during inference
   composerText.value = '';
   btnSend.disabled = true;
-  btnSend.textContent = 'Forward Pass...';
+  btnSend.textContent = 'Processing Query...';
 
   // Append temporary loading indicator
   const pendingEl = document.createElement('div');
   pendingEl.className = 'message-item assistant';
   pendingEl.innerHTML = `
-    <div class="message-sender">404 FOUNDERS Neural Core</div>
+    <div class="message-sender">404 FOUNDERS Engine</div>
     <div class="message-bubble" style="color: var(--text-muted); font-style: italic;">
-      Evaluating token embeddings, multi-head attention, and MoE routing...
+      ${hasAttachments ? 'Analyzing cross-modal features and executing fusion pipeline...' : 'Evaluating token embeddings, attention, and neural forward pass...'}
     </div>
   `;
   chatThread.appendChild(pendingEl);
@@ -184,59 +301,131 @@ async function sendChatMessage() {
   const startTime = performance.now();
 
   try {
-    const res = await fetch(`${API_BASE}/api/v1/neural/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        prompt: prompt,
-        max_new_tokens: maxTokens,
-        mode: mode
-      })
-    });
+    if (hasAttachments || isMultimodalQuery) {
+      // Multimodal REST Endpoint
+      const payload = {
+        text: prompt || null,
+        image_base64: activeAttachments.image ? activeAttachments.image.data : null,
+        audio_base64: activeAttachments.audio ? activeAttachments.audio.data : null,
+        video_base64: activeAttachments.video ? activeAttachments.video.data : null,
+        document_base64: activeAttachments.doc ? activeAttachments.doc.data : null,
+        filename_hints: {
+          image: activeAttachments.image ? activeAttachments.image.name : '',
+          audio: activeAttachments.audio ? activeAttachments.audio.name : '',
+          video: activeAttachments.video ? activeAttachments.video.name : '',
+          document: activeAttachments.doc ? activeAttachments.doc.name : ''
+        },
+        perform_fusion: chkFusion ? chkFusion.checked : true,
+        fusion_stage: "EARLY",
+        synthesize_speech: chkTTS ? chkTTS.checked : false
+      };
 
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.detail || `HTTP ${res.status}`);
+      const res = await fetch(`${API_BASE}/api/v1/multimodal/process`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      const elapsed = (performance.now() - startTime).toFixed(1);
+
+      let audioPlayerHtml = '';
+      if (data.speech_audio_base64_uri) {
+        audioPlayerHtml = `
+          <div style="margin-top: 10px; padding: 8px; background: var(--surface-secondary); border-radius: 4px; border: 1px solid var(--border);">
+            <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 4px;">🎙️ Synthesized Speech Response (Acoustic Formant Waveform):</div>
+            <audio controls autoplay src="${data.speech_audio_base64_uri}" style="width: 100%; height: 32px;"></audio>
+          </div>
+        `;
+      }
+
+      const modalityTagsHtml = data.active_modalities.map(m => `<span class="badge-outline">${escapeHtml(m)}</span>`).join(' ');
+
+      pendingEl.innerHTML = `
+        <div class="message-sender">404 FOUNDERS Multimodal Engine &bull; ${escapeHtml(data.primary_modality)}</div>
+        <div class="message-bubble">
+          <div style="margin-bottom: 8px;">${modalityTagsHtml}</div>
+          <div style="font-weight: 500; line-height: 1.5; margin-bottom: 8px;">
+            ${escapeHtml(data.combined_summary)}
+          </div>
+          ${data.document_summary ? `<div style="font-size: 12px; margin-top: 6px; padding: 6px 8px; background: var(--surface-secondary); border-radius: 4px; border: 1px solid var(--border);"><strong>Document Intelligence:</strong> ${escapeHtml(data.document_summary)}</div>` : ''}
+          ${data.image_caption ? `<div style="font-size: 12px; margin-top: 6px; padding: 6px 8px; background: var(--surface-secondary); border-radius: 4px; border: 1px solid var(--border);"><strong>Vision Intelligence:</strong> ${escapeHtml(data.image_caption)}</div>` : ''}
+          ${data.speech_transcript ? `<div style="font-size: 12px; margin-top: 6px; padding: 6px 8px; background: var(--surface-secondary); border-radius: 4px; border: 1px solid var(--border);"><strong>Speech Recognition:</strong> ${escapeHtml(data.speech_transcript)}</div>` : ''}
+          ${audioPlayerHtml}
+        </div>
+        <div class="message-metadata">
+          <span>Latency: ${elapsed} ms</span>
+          <span>Primary: ${escapeHtml(data.primary_modality)}</span>
+          <span>Multimodal: ${data.is_multimodal}</span>
+          <span>Fusion: ${data.fusion_active_modalities ? data.fusion_active_modalities.join('+') : 'None'}</span>
+        </div>
+      `;
+
+      // Clear attachments
+      activeAttachments.image = null;
+      activeAttachments.audio = null;
+      activeAttachments.video = null;
+      activeAttachments.doc = null;
+      renderAttachmentTray();
+    } else {
+      // Standard Neural Generation
+      const res = await fetch(`${API_BASE}/api/v1/neural/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: prompt,
+          max_new_tokens: 32,
+          mode: 'general'
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      const elapsed = (performance.now() - startTime).toFixed(1);
+
+      let tokenPillsHtml = '';
+      data.generated_tokens.forEach((tok, i) => {
+        const id = data.generated_ids[i];
+        tokenPillsHtml += `<span class="subword-pill">${escapeHtml(tok)}<span class="subword-id">#${id}</span></span>`;
+      });
+
+      pendingEl.innerHTML = `
+        <div class="message-sender">404 FOUNDERS Neural Core &bull; Random Init</div>
+        <div class="message-bubble">
+          <div style="font-weight: 500; margin-bottom: 6px;">
+            ${escapeHtml(data.prompt)} <span style="font-weight: 600; color: var(--accent-primary);">${escapeHtml(data.generated_text)}</span>
+          </div>
+          <div style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--border);">
+            <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">Generated Token Pieces:</div>
+            <div class="subword-grid">${tokenPillsHtml}</div>
+          </div>
+        </div>
+        <div class="message-metadata">
+          <span>Latency: ${data.latency_ms} ms</span>
+          <span>Prompt IDs: [${data.prompt_ids.join(', ')}]</span>
+          <span>Generated IDs: [${data.generated_ids.join(', ')}]</span>
+        </div>
+      `;
     }
-
-    const data = await res.json();
-    const elapsed = (performance.now() - startTime).toFixed(1);
-
-    // Build token pills
-    let tokenPillsHtml = '';
-    data.generated_tokens.forEach((tok, i) => {
-      const id = data.generated_ids[i];
-      tokenPillsHtml += `<span class="subword-pill">${escapeHtml(tok)}<span class="subword-id">#${id}</span></span>`;
-    });
-
-    // Replace pending element with response
-    pendingEl.innerHTML = `
-      <div class="message-sender">404 FOUNDERS Neural Core &bull; Random Init</div>
-      <div class="message-bubble">
-        <div style="font-weight: 500; margin-bottom: 6px;">
-          ${escapeHtml(data.prompt)} <span style="font-weight: 600; color: var(--accent-primary);">${escapeHtml(data.generated_text)}</span>
-        </div>
-        <div style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--border);">
-          <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">Generated Token Pieces:</div>
-          <div class="subword-grid">${tokenPillsHtml}</div>
-        </div>
-      </div>
-      <div class="message-metadata">
-        <span>Latency: ${data.latency_ms} ms</span>
-        <span>Prompt IDs: [${data.prompt_ids.join(', ')}]</span>
-        <span>Generated IDs: [${data.generated_ids.join(', ')}]</span>
-      </div>
-    `;
   } catch (err) {
     pendingEl.innerHTML = `
-      <div class="message-sender">Neural Core Error</div>
+      <div class="message-sender">Engine Execution Error</div>
       <div class="message-bubble" style="border-left-color: var(--status-error); color: var(--status-error);">
-        Failed to execute forward pass: ${escapeHtml(err.message)}
+        Failed to execute query: ${escapeHtml(err.message)}
       </div>
     `;
   } finally {
     btnSend.disabled = false;
-    btnSend.textContent = 'Generate Next Tokens';
+    btnSend.textContent = 'Execute Multimodal Query';
     chatThread.scrollTop = chatThread.scrollHeight;
   }
 }
@@ -541,6 +730,401 @@ async function inspectPrompt() {
 }
 
 // -------------------------------------------------------------------------
+// View 8: Multimodal Intelligence Studio
+// -------------------------------------------------------------------------
+
+window.switchMultimodalTab = function(tabName) {
+  const tabs = ['vision', 'audio', 'video', 'doc', 'fusion'];
+  tabs.forEach(t => {
+    const cap = t.charAt(0).toUpperCase() + t.slice(1);
+    const btn = document.getElementById(`tabBtn${cap}`);
+    const panel = document.getElementById(`mmodalTab${cap}`);
+    if (btn) {
+      if (t === tabName) btn.classList.add('active');
+      else btn.classList.remove('active');
+    }
+    if (panel) {
+      if (t === tabName) {
+        panel.style.display = 'block';
+        panel.classList.add('active');
+      } else {
+        panel.style.display = 'none';
+        panel.classList.remove('active');
+      }
+    }
+  });
+};
+
+function initMultimodalStudio() {
+  // Vision Handlers
+  const btnRunImage = document.getElementById('btnRunImageAnalysis');
+  const btnLoadSample = document.getElementById('btnLoadSampleImage');
+  const inputImage = document.getElementById('imageStudioFileInput');
+
+  if (btnLoadSample) {
+    btnLoadSample.addEventListener('click', () => {
+      // Create a 224x224 Canvas sample image
+      const canvas = document.createElement('canvas');
+      canvas.width = 224;
+      canvas.height = 224;
+      const ctx = canvas.getContext('2d');
+
+      // Gradient background
+      const grad = ctx.createLinearGradient(0, 0, 224, 224);
+      grad.addColorStop(0, '#343D35');
+      grad.addColorStop(0.5, '#A58C70');
+      grad.addColorStop(1, '#F4F0E8');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 224, 224);
+
+      // Geometric patterns
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(32, 32, 160, 160);
+      ctx.beginPath();
+      ctx.arc(112, 112, 48, 0, 2 * Math.PI);
+      ctx.stroke();
+
+      // Text label
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 16px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('404 FOUNDERS', 112, 118);
+
+      const dataUri = canvas.toDataURL('image/png');
+      const base64Data = dataUri.split(',')[1];
+
+      const previewImg = document.getElementById('imagePreviewImg');
+      const previewContainer = document.getElementById('imagePreviewContainer');
+      if (previewImg && previewContainer) {
+        previewImg.src = dataUri;
+        previewContainer.style.display = 'block';
+      }
+
+      runImageAnalysisWithPayload(base64Data);
+    });
+  }
+
+  if (btnRunImage && inputImage) {
+    btnRunImage.addEventListener('click', () => {
+      const file = inputImage.files && inputImage.files[0];
+      if (!file) {
+        alert('Please choose an image file first or click "Load Sample Image".');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUri = e.target.result;
+        const base64Data = dataUri.split(',')[1];
+        const previewImg = document.getElementById('imagePreviewImg');
+        const previewContainer = document.getElementById('imagePreviewContainer');
+        if (previewImg && previewContainer) {
+          previewImg.src = dataUri;
+          previewContainer.style.display = 'block';
+        }
+        runImageAnalysisWithPayload(base64Data);
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // Audio & Speech Handlers
+  const btnRunAudio = document.getElementById('btnRunAudioAnalysis');
+  const btnRunSTT = document.getElementById('btnRunSpeechSTT');
+  const inputAudio = document.getElementById('audioStudioFileInput');
+  const btnRunTTS = document.getElementById('btnRunSpeechTTS');
+
+  if (btnRunAudio && inputAudio) {
+    btnRunAudio.addEventListener('click', () => {
+      const file = inputAudio.files && inputAudio.files[0];
+      if (!file) {
+        alert('Please select an audio file (WAV, MP3, FLAC, OGG).');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64Data = e.target.result.split(',')[1];
+        const resultsBox = document.getElementById('audioResultsBox');
+        resultsBox.textContent = 'Calculating STFT spectrogram and energy features...';
+        try {
+          const res = await fetch(`${API_BASE}/api/v1/multimodal/audio`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ audio_base64: base64Data })
+          });
+          if (!res.ok) throw new Error(await res.text());
+          const data = await res.json();
+          resultsBox.innerHTML = `
+            <strong>Format:</strong> ${escapeHtml(data.format)} | <strong>Duration:</strong> ${data.duration_seconds.toFixed(2)}s | <strong>Sample Rate:</strong> ${data.sample_rate} Hz<br/>
+            <strong>RMS Energy:</strong> ${data.rms_energy.toFixed(4)} | <strong>Estimated SNR:</strong> ${data.estimated_snr_db.toFixed(1)} dB | <strong>Silent:</strong> ${data.is_silent}<br/>
+            <div style="margin-top: 6px; font-size: 12px; color: var(--accent-primary);"><em>${escapeHtml(data.summary)}</em></div>
+          `;
+        } catch (err) {
+          resultsBox.innerHTML = `<span style="color: var(--status-error);">Audio inspection error: ${escapeHtml(err.message)}</span>`;
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  if (btnRunSTT && inputAudio) {
+    btnRunSTT.addEventListener('click', () => {
+      const file = inputAudio.files && inputAudio.files[0];
+      if (!file) {
+        alert('Please select a speech audio file to transcribe.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64Data = e.target.result.split(',')[1];
+        const resultsBox = document.getElementById('audioResultsBox');
+        resultsBox.textContent = 'Segmenting speech intervals and running acoustic recognizer...';
+        try {
+          const res = await fetch(`${API_BASE}/api/v1/multimodal/speech/recognize`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ audio_base64: base64Data, language_hint: 'en' })
+          });
+          if (!res.ok) throw new Error(await res.text());
+          const data = await res.json();
+          resultsBox.innerHTML = `
+            <strong>Detected Language:</strong> ${escapeHtml(data.detected_language.toUpperCase())} | <strong>Confidence:</strong> ${(data.overall_confidence * 100).toFixed(1)}% | <strong>Segments:</strong> ${data.segments_count}<br/>
+            <div style="margin-top: 8px; padding: 8px; background: var(--surface-content); border-radius: var(--radius-sm); border: 1px solid var(--border);">
+              <strong>Transcript:</strong> "${escapeHtml(data.full_transcript)}"
+            </div>
+          `;
+        } catch (err) {
+          resultsBox.innerHTML = `<span style="color: var(--status-error);">Speech recognition error: ${escapeHtml(err.message)}</span>`;
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  if (btnRunTTS) {
+    btnRunTTS.addEventListener('click', async () => {
+      const text = document.getElementById('ttsTextInput').value.trim();
+      const lang = document.getElementById('ttsLangSelect').value;
+      const pitch = parseFloat(document.getElementById('ttsPitchInput').value) || 220.0;
+      const statusBox = document.getElementById('ttsStatusBox');
+      const player = document.getElementById('ttsAudioPlayer');
+
+      if (!text) {
+        alert('Please enter text to synthesize.');
+        return;
+      }
+
+      statusBox.textContent = 'Synthesizing speech via acoustic vocal tract formant model...';
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/multimodal/speech/synthesize`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: text,
+            language: lang,
+            voice_id: 'default_neutral',
+            pitch_hz: pitch,
+            speed_factor: 1.0
+          })
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        player.src = data.audio_base64_uri;
+        player.style.display = 'block';
+        player.play().catch(() => {});
+        statusBox.innerHTML = `
+          <strong>Generated:</strong> ${data.duration_seconds.toFixed(2)}s WAV (16 kHz 16-bit PCM mono)<br/>
+          <em>${escapeHtml(data.summary)}</em>
+        `;
+      } catch (err) {
+        statusBox.innerHTML = `<span style="color: var(--status-error);">TTS synthesis error: ${escapeHtml(err.message)}</span>`;
+      }
+    });
+  }
+
+  // Video Handler
+  const btnRunVideo = document.getElementById('btnRunVideoAnalysis');
+  const inputVideo = document.getElementById('videoStudioFileInput');
+  if (btnRunVideo && inputVideo) {
+    btnRunVideo.addEventListener('click', () => {
+      const file = inputVideo.files && inputVideo.files[0];
+      if (!file) {
+        alert('Please select a video file (MP4, WEBM, MOV).');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64Data = e.target.result.split(',')[1];
+        const summaryBox = document.getElementById('videoSummaryBox');
+        summaryBox.textContent = 'Streaming OpenCV video frames and identifying scene keyframes...';
+        try {
+          const res = await fetch(`${API_BASE}/api/v1/multimodal/process`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              video_base64: base64Data,
+              filename_hints: { video: file.name },
+              perform_fusion: false
+            })
+          });
+          if (!res.ok) throw new Error(await res.text());
+          const data = await res.json();
+          summaryBox.innerHTML = `
+            <strong>Video Intelligence Report:</strong><br/>
+            ${escapeHtml(data.video_summary || data.combined_summary)}
+          `;
+        } catch (err) {
+          summaryBox.innerHTML = `<span style="color: var(--status-error);">Video processing error: ${escapeHtml(err.message)}</span>`;
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // Document Handler
+  const btnRunDoc = document.getElementById('btnRunDocAnalysis');
+  const inputDoc = document.getElementById('docStudioFileInput');
+  if (btnRunDoc && inputDoc) {
+    btnRunDoc.addEventListener('click', () => {
+      const file = inputDoc.files && inputDoc.files[0];
+      if (!file) {
+        alert('Please select a document file (.pdf, .docx, .csv, .json, .txt, .md).');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64Data = e.target.result.split(',')[1];
+        const previewBox = document.getElementById('docPreviewBox');
+        const detailsBox = document.getElementById('docDetailsBox');
+        previewBox.textContent = 'Parsing document structure and auditing prompt injection defense...';
+        try {
+          const res = await fetch(`${API_BASE}/api/v1/multimodal/document`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              document_base64: base64Data,
+              filename: file.name
+            })
+          });
+          if (!res.ok) throw new Error(await res.text());
+          const data = await res.json();
+
+          document.getElementById('docResFormat').textContent = data.format;
+          document.getElementById('docResPages').textContent = data.page_count;
+          document.getElementById('docResWords').textContent = data.word_count.toLocaleString();
+          document.getElementById('docResChunks').textContent = data.chunks_count;
+          document.getElementById('docResTables').textContent = data.has_tables ? 'Yes (Tabular Data Found)' : 'None';
+
+          const badge = document.getElementById('docSafetyBadge');
+          const secStatus = document.getElementById('docResSecurity');
+          if (data.is_safe) {
+            badge.className = 'card-tag';
+            badge.style.color = 'var(--status-success)';
+            badge.textContent = 'PASSED (SAFE)';
+            secStatus.textContent = 'Passed (Zero Injection Risk)';
+          } else {
+            badge.className = 'card-tag';
+            badge.style.color = 'var(--status-error)';
+            badge.textContent = 'DEFENSE BLOCKED';
+            secStatus.textContent = `Flagged: ${data.detected_injection_risks.join(', ')}`;
+          }
+
+          previewBox.innerHTML = `
+            <strong>File:</strong> ${escapeHtml(file.name)} (${data.format})<br/>
+            <strong>Chunks:</strong> ${data.chunks_count} | <strong>Words:</strong> ${data.word_count}<br/>
+            <div style="margin-top: 6px;"><em>${escapeHtml(data.summary)}</em></div>
+          `;
+          detailsBox.textContent = `Security audit verified on document payload. Defensive injection analysis: ${data.is_safe ? 'CLEAN' : 'FLAGGED RISK'}.`;
+        } catch (err) {
+          previewBox.innerHTML = `<span style="color: var(--status-error);">Document analysis error: ${escapeHtml(err.message)}</span>`;
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // Fusion Handler
+  const btnRunFusion = document.getElementById('btnRunFusionExecution');
+  if (btnRunFusion) {
+    btnRunFusion.addEventListener('click', async () => {
+      const activeMods = [];
+      if (document.getElementById('fuseModText').checked) activeMods.push('TEXT');
+      if (document.getElementById('fuseModImage').checked) activeMods.push('IMAGE');
+      if (document.getElementById('fuseModAudio').checked) activeMods.push('AUDIO');
+      if (document.getElementById('fuseModVideo').checked) activeMods.push('VIDEO');
+
+      if (activeMods.length === 0) {
+        alert('Please select at least one active modality for fusion.');
+        return;
+      }
+
+      const radio = document.querySelector('input[name="fusionStageRadio"]:checked');
+      const stage = radio ? radio.value : 'EARLY';
+      const resultsBox = document.getElementById('fusionResultsBox');
+
+      resultsBox.textContent = `Executing ${stage} multimodal fusion tensor synthesis...`;
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/multimodal/fuse`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            active_modalities: activeMods,
+            fusion_stage: stage
+          })
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+
+        let weightsHtml = Object.entries(data.modality_weights)
+          .map(([k, v]) => `<code>${k}: ${(v * 100).toFixed(1)}%</code>`)
+          .join(' &bull; ');
+
+        resultsBox.innerHTML = `
+          <strong>Fusion Stage:</strong> ${escapeHtml(data.fusion_stage)}<br/>
+          <strong>Active Modalities:</strong> [${data.active_modalities.join(', ')}]<br/>
+          <strong>Fused Tensor Shape:</strong> <code>[${data.fused_tensor_shape.join(', ')}]</code><br/>
+          <div style="margin-top: 8px;"><strong>Adaptive Modality Weights:</strong> ${weightsHtml}</div>
+        `;
+      } catch (err) {
+        resultsBox.innerHTML = `<span style="color: var(--status-error);">Fusion error: ${escapeHtml(err.message)}</span>`;
+      }
+    });
+  }
+}
+
+async function runImageAnalysisWithPayload(base64Data) {
+  const statusTag = document.getElementById('imageStatusTag');
+  const captionBox = document.getElementById('imageCaptionBox');
+  statusTag.textContent = 'Processing...';
+  captionBox.textContent = 'Validating magic bytes and extracting ViT patches...';
+
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/multimodal/image`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image_base64: base64Data, target_size: [224, 224] })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+
+    document.getElementById('imgResFormat').textContent = data.format;
+    document.getElementById('imgResResolution').textContent = `${data.width} × ${data.height}`;
+    document.getElementById('imgResAspect').textContent = data.aspect_ratio.toFixed(2);
+    document.getElementById('imgResChannels').textContent = `${data.channels} (RGB)`;
+    document.getElementById('imgResPatches').textContent = `${data.patch_count} patches (16×16)`;
+
+    captionBox.innerHTML = `
+      <strong>Caption Hypothesis:</strong> ${escapeHtml(data.caption)}<br/>
+      <div style="margin-top: 6px; font-size: 11.5px; color: var(--text-muted);">${escapeHtml(data.reasoning_summary)}</div>
+    `;
+    statusTag.textContent = 'Inspection Complete';
+  } catch (err) {
+    statusTag.textContent = 'Error';
+    captionBox.innerHTML = `<span style="color: var(--status-error);">Image analysis error: ${escapeHtml(err.message)}</span>`;
+  }
+}
+
+// -------------------------------------------------------------------------
 // Helpers
 // -------------------------------------------------------------------------
 
@@ -559,8 +1143,10 @@ function escapeHtml(str) {
 // -------------------------------------------------------------------------
 
 document.addEventListener('DOMContentLoaded', () => {
+  initThemeSwitcher();
   initNavigation();
   initChat();
+  initMultimodalStudio();
 
   // Telemetry handlers
   const btnRefreshTel = document.getElementById('btnRefreshTel');

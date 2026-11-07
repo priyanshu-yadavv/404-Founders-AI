@@ -289,18 +289,27 @@ Complete architectural specifications are maintained in [`docs/`](docs/):
 25. [**Central Intelligence Router**](docs/CENTRAL_INTELLIGENCE_ROUTER.md) (`DOC-INTEL-007`): Dynamic routing, multi-engine composite execution, and conflict resolution.
 26. [**Self-Evaluation & Error Detection**](docs/SELF_EVALUATION_ERROR_DETECTION.md) (`DOC-INTEL-008`): Consistency audits, epistemic modesty ("I don't know"), and offline feedback logging.
 
+### Multimodal Intelligence Architecture (Phase 08)
+27. [**Multimodal Intelligence**](docs/MULTIMODAL_INTELLIGENCE.md) (`DOC-MULTI-001`): Unified cross-modal processing across text, vision, audio waveforms, speech, video streams, documents, and multi-stage fusion.
+28. [**Vision & Image Processing**](docs/IMAGE_PROCESSING.md) (`DOC-MULTI-002`): Magic byte verification, decompression bomb limits, 224x224 spatial resizing, and ViT 16x16 patch extraction (`196, 768`).
+29. [**Audio & Speech Processing**](docs/AUDIO_SPEECH_PROCESSING.md) (`DOC-MULTI-003`): PCM normalization, STFT spectrograms, energy VAD, timestamped speech recognition, and formant speech synthesis generating playable WAV streams.
+30. [**Video Intelligence**](docs/VIDEO_INTELLIGENCE.md) (`DOC-MULTI-004`): OpenCV streaming frame ingestion without full video RAM decompression, uniform sampling, Chi-Square histogram scene boundaries, and thumbnails.
+31. [**Document Intelligence & Defense**](docs/DOCUMENT_INTELLIGENCE.md) (`DOC-MULTI-005`): Multi-format parsing (PDF, DOCX, CSV, JSON, TXT), structured table extraction, and adversarial prompt injection defense (`inspect_prompt_safety`).
+32. [**Multimodal Fusion Engine**](docs/MULTIMODAL_FUSION.md) (`DOC-MULTI-006`): Early (modality embeddings), Intermediate (cross-modal attention + LayerScale), and Late (adaptive softmax gating) fusion layers.
+33. [**Cross-Modal Context Manager**](docs/CROSS_MODAL_CONTEXT.md) (`DOC-MULTI-007`): Multi-turn conversational memory, bounded 10-turn ring buffer, and reverse chronological coreference resolution.
+
 ### System Architecture & Governance (Phase 01 & 02)
-27. [**System Architecture**](docs/SYSTEM_ARCHITECTURE.md) (`DOC-ARCH-001`): Operating modes, orchestration, and data flow.
-28. [**Neural Architecture**](docs/NEURAL_ARCHITECTURE.md) (`DOC-ARCH-002`): Layers, RoPE, SwiGLU, MMA attention, and MoE routing.
-29. [**Multimodal Architecture**](docs/MULTIMODAL_ARCHITECTURE.md) (`DOC-ARCH-003`): Vision, audio, video, text, and documents fusion.
-30. [**Memory Architecture**](docs/MEMORY_ARCHITECTURE.md) (`DOC-ARCH-004`): Multi-tier memory, infinite context, and consolidation.
-31. [**Personal AI Architecture**](docs/PERSONAL_AI_ARCHITECTURE.md) (`DOC-ARCH-005`): OS copilot, telemetry, coding, and defensive cybersecurity.
-32. [**API Architecture**](docs/API_ARCHITECTURE.md) (`DOC-ARCH-006`): REST, WebSocket, and gRPC protocol specifications.
-33: [**Security Architecture**](docs/SECURITY_ARCHITECTURE.md) (`DOC-ARCH-007`): Threat model, 4-tier permissions, audit logging, and sandbox.
-34. [**Data Architecture**](docs/DATA_ARCHITECTURE.md) (`DOC-ARCH-008`): Streaming ETL, MinHash deduplication, and binary sharding.
-35. [**Infrastructure Architecture**](docs/INFRASTRUCTURE_ARCHITECTURE.md) (`DOC-ARCH-009`): Hybrid local, cloud, and GPU cluster targets.
-36. [**Development Standards**](docs/DEVELOPMENT_STANDARDS.md) (`DOC-STANDARDS-001`): Code formatting, typing, logging, and exceptions.
-37. [**Hardware Assessment Report**](docs/phase-01-hardware-assessment.md) (`DOC-PHASE01-SYS-001`): Physical host telemetry on Dell Latitude 5400.
+34. [**System Architecture**](docs/SYSTEM_ARCHITECTURE.md) (`DOC-ARCH-001`): Operating modes, orchestration, and data flow.
+35. [**Neural Architecture**](docs/NEURAL_ARCHITECTURE.md) (`DOC-ARCH-002`): Layers, RoPE, SwiGLU, MMA attention, and MoE routing.
+36. [**Multimodal Architecture**](docs/MULTIMODAL_ARCHITECTURE.md) (`DOC-ARCH-003`): Vision, audio, video, text, and documents fusion.
+37. [**Memory Architecture**](docs/MEMORY_ARCHITECTURE.md) (`DOC-ARCH-004`): Multi-tier memory, infinite context, and consolidation.
+38. [**Personal AI Architecture**](docs/PERSONAL_AI_ARCHITECTURE.md) (`DOC-ARCH-005`): OS copilot, telemetry, coding, and defensive cybersecurity.
+39. [**API Architecture**](docs/API_ARCHITECTURE.md) (`DOC-ARCH-006`): REST, WebSocket, and gRPC protocol specifications.
+40. [**Security Architecture**](docs/SECURITY_ARCHITECTURE.md) (`DOC-ARCH-007`): Threat model, 4-tier permissions, audit logging, and sandbox.
+41. [**Data Architecture**](docs/DATA_ARCHITECTURE.md) (`DOC-ARCH-008`): Streaming ETL, MinHash deduplication, and binary sharding.
+42. [**Infrastructure Architecture**](docs/INFRASTRUCTURE_ARCHITECTURE.md) (`DOC-ARCH-009`): Hybrid local, cloud, and GPU cluster targets.
+43. [**Development Standards**](docs/DEVELOPMENT_STANDARDS.md) (`DOC-STANDARDS-001`): Code formatting, typing, logging, and exceptions.
+44. [**Hardware Assessment Report**](docs/phase-01-hardware-assessment.md) (`DOC-PHASE01-SYS-001`): Physical host telemetry on Dell Latitude 5400.
 
 ---
 
@@ -334,7 +343,38 @@ flowchart TD
 
 ---
 
-## 9. Development Roadmap & Phase Status
+## 9. Multimodal Intelligence Architecture (Phase 08)
+
+The Phase 08 multimodal intelligence architecture unifies cross-modal processing across Text, Vision, Audio, Speech, Video, and Documents:
+
+```mermaid
+flowchart TD
+    UserMedia["User Media Query / Files"] --> MR["ModalityRouter<br/>(Simultaneous Detection & Dispatch)"]
+
+    subgraph PROCESSORS ["Specialized Multimodal Processors"]
+        P_TXT["MultimodalTextProcessor<br/>(Devanagari, English, Overlapping Chunking)"]
+        P_IMG["ImageProcessor<br/>(Magic Bytes, 224x224, ViT 16x16 Patches)"]
+        P_AUD["AudioProcessor<br/>(PCM Normalize, STFT Spectrogram, RMS/SNR)"]
+        P_SPK["SpeechEngine<br/>(Energy VAD, STT Segments, Formant TTS)"]
+        P_VID["VideoProcessor<br/>(OpenCV Streaming, Chi-Square Keyframes)"]
+        P_DOC["DocumentProcessor<br/>(PDF, DOCX, CSV, Injection Scanning)"]
+    end
+
+    subgraph FUSION ["Multi-Stage Multimodal Fusion Engine"]
+        F_EARLY["Early Fusion (Modality Embeddings & Sequence Concat)"]
+        F_INTER["Intermediate Fusion (Cross-Modal Attention + LayerScale)"]
+        F_LATE["Late Fusion (Adaptive Softmax Gating)"]
+    end
+
+    MR --> PROCESSORS
+    PROCESSORS --> FUSION
+    FUSION --> FusedOut["Unified Multimodal Representation"]
+    FusedOut --> CIR2["Central Intelligence Router"]
+```
+
+---
+
+## 10. Development Roadmap & Phase Status
 
 | Phase | Phase Name | Status |
 |---|---|---|
@@ -344,16 +384,16 @@ flowchart TD
 | **Phase 04** | Custom BPE Tokenizer & Data Pipeline | **Completed** |
 | **Phase 05** | Training Infrastructure & GPU Cluster Architecture | **Completed** |
 | **Phase 06** | Foundation Model Pretraining from Random Initialization | **Completed** |
-| **Phase 07** | **Intelligence Modules** | **Completed (Review Pending)** |
-| Phase 08 | Multimodal Intelligence & Cross-Modal Fusion | Planned |
+| **Phase 07** | Modular Intelligence Modules | **Completed** |
+| **Phase 08** | **Multimodal Intelligence & Cross-Modal Fusion** | **Completed (Review Pending)** |
 
 ---
 
-## 10. Quickstart, Localhost Testing & Verification
+## 11. Quickstart, Localhost Testing & Verification
 
 ### Localhost Application Execution
 
-The project can be run locally on the developer workstation without GPUs or pretrained weights.
+The project runs locally on the developer workstation without GPUs or pretrained weights.
 
 #### Step 1: Launch Backend API Server (FastAPI + Uvicorn)
 ```bash
@@ -376,16 +416,22 @@ cd frontend && npm start
 node frontend/server.js
 ```
 - **Local Dashboard:** [http://localhost:5173](http://localhost:5173)
+- **Features:** Warm neutral design, Light/Dark/System theme selector, Multimodal Studio view, and chat composer attachment tray for images, audio, video, and documents.
 
 ---
 
 ### Automated Tests & CLI Diagnostics
 
 ```bash
-# 1. Run complete automated test suite (197 tests) on CPU
+# 1. Run complete automated test suite (247 tests) on CPU
 .venv/bin/python -m pytest tests/
 
-# 2. Interact with the 12 Modular Intelligence Engines via CLI
+# 2. Interact with the Unified Multimodal Engine via CLI
+.venv/bin/python scripts/run_multimodal.py --list-modalities
+.venv/bin/python scripts/run_multimodal.py --text "404 FOUNDERS is an enterprise AI assistant." --speech-tts
+.venv/bin/python scripts/run_multimodal.py --fuse --fuse-stage EARLY
+
+# 3. Interact with the 12 Modular Intelligence Engines via CLI
 .venv/bin/python scripts/run_intelligence.py --list-modules
 .venv/bin/python scripts/run_intelligence.py --query "calculate 42 * (15 + 3)"
 .venv/bin/python scripts/run_intelligence.py --query "analyze python code: def factorial(n): return 1 if n<=1 else n*factorial(n-1)"

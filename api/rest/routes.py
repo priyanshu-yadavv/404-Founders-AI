@@ -11,16 +11,23 @@ import subprocess
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+import torch
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from api.rest.schemas import (
+    AudioProcessRequest,
+    AudioProcessResponse,
     CodingAnalysisRequest,
     CodingAnalysisResponse,
     CommandValidationRequest,
     CommandValidationResponse,
     DecodeRequest,
     DecodeResponse,
+    DocumentProcessRequest,
+    DocumentProcessResponse,
     HealthResponse,
+    ImageProcessRequest,
+    ImageProcessResponse,
     InferenceRequest,
     InferenceResponse,
     IntelligenceQueryRequest,
@@ -29,6 +36,10 @@ from api.rest.schemas import (
     LogicalReasoningResponse,
     MathReasoningRequest,
     MathReasoningResponse,
+    MultimodalFuseRequest,
+    MultimodalFuseResponse,
+    MultimodalProcessRequest,
+    MultimodalProcessResponse,
     PhaseStatusResponse,
     PlanningRequest,
     PlanningResponse,
@@ -38,6 +49,10 @@ from api.rest.schemas import (
     SecurityAuditResponse,
     SelfEvaluationRequest,
     SelfEvaluationResponse,
+    SpeechRecognizeRequest,
+    SpeechRecognizeResponse,
+    SpeechSynthesizeRequest,
+    SpeechSynthesizeResponse,
     TelemetryResponse,
     TokenizeRequest,
     TokenizeResponse,
@@ -45,6 +60,9 @@ from api.rest.schemas import (
 from core.exceptions import SecurityViolationError
 from core.intelligence.central_router import CentralIntelligenceRouter
 from core.intelligence.neural_core import NeuralCore, NeuralCoreConfig
+from multimodal.audio.speech_generation import VoiceConfig
+from multimodal.modality_router import ModalityRouter
+from neural_architecture.fusion.multimodal_fusion import MultimodalInput
 from infrastructure.gpu_cluster import ClusterCatalog
 from infrastructure.local import LocalHardwareInspector, LocalRuntimeManager
 from neural_architecture.inference import InferenceEngine
@@ -665,4 +683,292 @@ async def self_evaluate_output(
         contains_contradictions=eval_res.contains_contradictions,
         missing_elements=eval_res.missing_elements,
         summary=eval_res.summary,
+    )
+
+
+# -------------------------------------------------------------------------
+# Phase 08 — Multimodal Intelligence Endpoints
+# -------------------------------------------------------------------------
+
+import base64
+
+
+def _get_modality_router(services: Dict[str, Any]) -> ModalityRouter:
+    """Helper to retrieve or lazily create ModalityRouter."""
+    if "modality_router" in services and services["modality_router"] is not None:
+        return services["modality_router"]
+    c_router = _get_central_router(services)
+    m_router = ModalityRouter(central_router=c_router)
+    services["modality_router"] = m_router
+    return m_router
+
+
+def _clean_and_decode_base64(raw_str: str) -> bytes:
+    """Decode raw base64 or strip data URI prefix (e.g. data:image/png;base64,...)."""
+    cleaned = raw_str.strip()
+    if "," in cleaned and cleaned.startswith("data:"):
+        cleaned = cleaned.split(",", 1)[1]
+    return base64.b64decode(cleaned)
+
+
+@router.get(
+    "/api/v1/multimodal/modalities",
+    tags=["Multimodal"],
+    summary="List all supported multimodal capabilities and formats",
+)
+async def list_modalities() -> Dict[str, Any]:
+    """Returns capabilities, supported formats, and fusion stages for Phase 08."""
+    return {
+        "status": "active",
+        "phase": "Phase 08 — Multimodal Intelligence",
+        "supported_modalities": [
+            {"id": "text", "name": "Text Intelligence", "formats": ["UTF-8", "Hindi/Devanagari", "Code"]},
+            {"id": "image", "name": "Image Intelligence", "formats": ["PNG", "JPEG", "WEBP", "BMP"]},
+            {"id": "audio", "name": "Audio Intelligence", "formats": ["WAV", "MP3", "FLAC", "OGG", "M4A"]},
+            {"id": "speech_stt", "name": "Speech Recognition (STT)", "languages": ["en", "hi"]},
+            {"id": "speech_tts", "name": "Speech Generation (TTS)", "languages": ["en", "hi"]},
+            {"id": "video", "name": "Video Intelligence", "formats": ["MP4", "MOV", "WEBM"]},
+            {"id": "document", "name": "Document Intelligence", "formats": ["PDF", "DOCX", "CSV", "JSON", "TXT", "MD"]},
+        ],
+        "fusion_stages": ["EARLY", "INTERMEDIATE", "LATE"],
+        "security_policy": "Untrusted input defense; prompt injection scanning; zero external cloud API calls without approval.",
+    }
+
+
+@router.post(
+    "/api/v1/multimodal/process",
+    response_model=MultimodalProcessResponse,
+    tags=["Multimodal"],
+    summary="Unified multi-modality processing and multi-stage fusion",
+)
+async def process_multimodal(
+    req: MultimodalProcessRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> MultimodalProcessResponse:
+    """Processes combination of text, image, audio, video, and documents."""
+    m_router = _get_modality_router(services)
+
+    img_bytes = _clean_and_decode_base64(req.image_base64) if req.image_base64 else None
+    aud_bytes = _clean_and_decode_base64(req.audio_base64) if req.audio_base64 else None
+    vid_bytes = _clean_and_decode_base64(req.video_base64) if req.video_base64 else None
+    doc_bytes = _clean_and_decode_base64(req.document_base64) if req.document_base64 else None
+
+    try:
+        res = m_router.route_and_process(
+            text=req.text,
+            image_data=img_bytes,
+            audio_data=aud_bytes,
+            video_data=vid_bytes,
+            document_data=doc_bytes,
+            filename_hints=req.filename_hints,
+            perform_fusion=req.perform_fusion,
+            fusion_stage=req.fusion_stage,
+            synthesize_speech=req.synthesize_speech,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    return MultimodalProcessResponse(
+        primary_modality=res.detection.primary_modality,
+        active_modalities=res.detection.active_modalities,
+        is_multimodal=res.detection.is_multimodal,
+        text_summary=res.text_result.summary if res.text_result else None,
+        image_caption=res.image_result.caption_hypothesis if res.image_result else None,
+        audio_summary=res.audio_result.summary if res.audio_result else None,
+        speech_transcript=res.speech_recognition_result.full_transcript if res.speech_recognition_result else None,
+        speech_audio_base64_uri=res.speech_synthesis_result.audio_base64_uri if res.speech_synthesis_result else None,
+        video_summary=res.video_result.video_summary if res.video_result else None,
+        document_summary=res.document_result.summary if res.document_result else None,
+        document_safe=res.document_result.security_report.is_safe if res.document_result else None,
+        fusion_active_modalities=res.fusion_output.active_modalities if res.fusion_output else None,
+        combined_summary=res.combined_response_summary,
+    )
+
+
+@router.post(
+    "/api/v1/multimodal/image",
+    response_model=ImageProcessResponse,
+    tags=["Multimodal"],
+    summary="Image inspection, patch extraction, and format validation",
+)
+async def process_image(
+    req: ImageProcessRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> ImageProcessResponse:
+    """Inspects and validates image bytes, extracting patch tensors for vision models."""
+    m_router = _get_modality_router(services)
+    try:
+        img_bytes = _clean_and_decode_base64(req.image_base64)
+        target = req.target_size or (224, 224)
+        res = m_router.image_processor.process(img_bytes, target_size=target)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    return ImageProcessResponse(
+        format=res.metadata.format,
+        width=res.metadata.width,
+        height=res.metadata.height,
+        aspect_ratio=res.metadata.aspect_ratio,
+        channels=res.metadata.channels,
+        patch_count=res.patch_count,
+        caption=res.caption_hypothesis,
+        reasoning_summary=res.visual_reasoning_summary,
+    )
+
+
+@router.post(
+    "/api/v1/multimodal/audio",
+    response_model=AudioProcessResponse,
+    tags=["Multimodal"],
+    summary="Audio waveform inspection, energy metrics, and SNR estimation",
+)
+async def process_audio(
+    req: AudioProcessRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> AudioProcessResponse:
+    """Inspects and analyzes audio track waveform, channels, and spectrogram properties."""
+    m_router = _get_modality_router(services)
+    try:
+        aud_bytes = _clean_and_decode_base64(req.audio_base64)
+        res = m_router.audio_processor.process(aud_bytes)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    return AudioProcessResponse(
+        format=res.metadata.format,
+        duration_seconds=res.metadata.duration_seconds,
+        sample_rate=res.metadata.sample_rate,
+        channels=res.metadata.channels,
+        rms_energy=res.features.rms_energy,
+        estimated_snr_db=res.features.estimated_snr_db,
+        is_silent=res.features.is_silent,
+        summary=res.summary,
+    )
+
+
+@router.post(
+    "/api/v1/multimodal/speech/recognize",
+    response_model=SpeechRecognizeResponse,
+    tags=["Multimodal"],
+    summary="Speech-to-text recognition with timestamped segments",
+)
+async def recognize_speech(
+    req: SpeechRecognizeRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> SpeechRecognizeResponse:
+    """Transcribes spoken audio into timestamped segments."""
+    m_router = _get_modality_router(services)
+    try:
+        aud_bytes = _clean_and_decode_base64(req.audio_base64)
+        res = m_router.speech_recognizer.transcribe(aud_bytes, language_hint=req.language_hint)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    return SpeechRecognizeResponse(
+        full_transcript=res.full_transcript,
+        detected_language=res.detected_language,
+        overall_confidence=res.overall_confidence,
+        duration_seconds=res.duration_seconds,
+        segments_count=len(res.segments),
+    )
+
+
+@router.post(
+    "/api/v1/multimodal/speech/synthesize",
+    response_model=SpeechSynthesizeResponse,
+    tags=["Multimodal"],
+    summary="Text-to-speech synthesis generating playable WAV audio",
+)
+async def synthesize_speech(
+    req: SpeechSynthesizeRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> SpeechSynthesizeResponse:
+    """Synthesizes text into audible PCM WAV bytes and base64 data URI."""
+    m_router = _get_modality_router(services)
+    try:
+        cfg = VoiceConfig(
+            voice_id=req.voice_id,
+            language=req.language,
+            pitch_hz=req.pitch_hz,
+            speed_factor=req.speed_factor,
+        )
+        res = m_router.speech_generator.synthesize(req.text, voice_config=cfg)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    return SpeechSynthesizeResponse(
+        text=res.text,
+        language=res.language,
+        duration_seconds=res.duration_seconds,
+        sample_rate=res.sample_rate,
+        audio_base64_uri=res.audio_base64_uri,
+        summary=res.summary,
+    )
+
+
+@router.post(
+    "/api/v1/multimodal/document",
+    response_model=DocumentProcessResponse,
+    tags=["Multimodal"],
+    summary="Document extraction and prompt injection security audit",
+)
+async def process_document(
+    req: DocumentProcessRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> DocumentProcessResponse:
+    """Extracts text and tables from document and scans for prompt injection threats."""
+    m_router = _get_modality_router(services)
+    try:
+        doc_bytes = _clean_and_decode_base64(req.document_base64)
+        res = m_router.document_processor.process(doc_bytes, filename_hint=req.filename)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    return DocumentProcessResponse(
+        format=res.metadata.format,
+        page_count=res.metadata.page_count,
+        word_count=res.metadata.word_count,
+        chunks_count=len(res.chunks),
+        has_tables=res.metadata.has_tables,
+        is_safe=res.security_report.is_safe,
+        detected_injection_risks=res.security_report.detected_injection_patterns,
+        summary=res.summary,
+    )
+
+
+@router.post(
+    "/api/v1/multimodal/fuse",
+    response_model=MultimodalFuseResponse,
+    tags=["Multimodal"],
+    summary="Multi-stage multimodal fusion tensor coordinator",
+)
+async def fuse_multimodal_modalities(
+    req: MultimodalFuseRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> MultimodalFuseResponse:
+    """Simulates or coordinates early, intermediate, or late multimodal tensor fusion."""
+    m_router = _get_modality_router(services)
+    try:
+        active_upper = [m.upper() for m in req.active_modalities]
+        text_t = torch.randn(1, 16, 128) if "TEXT" in active_upper else None
+        img_t = torch.randn(1, 196, 768) if "IMAGE" in active_upper else None
+        aud_t = torch.randn(1, 64, 257) if "AUDIO" in active_upper else None
+        vid_t = torch.randn(1, 8, 768) if "VIDEO" in active_upper else None
+
+        inputs = MultimodalInput(
+            text_tensor=text_t,
+            image_tensor=img_t,
+            audio_tensor=aud_t,
+            video_tensor=vid_t,
+        )
+        res = m_router.fusion_engine.fuse(inputs, stage=req.fusion_stage)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    return MultimodalFuseResponse(
+        fusion_stage=res.fusion_stage,
+        active_modalities=res.active_modalities,
+        missing_modalities=res.missing_modalities,
+        fused_tensor_shape=list(res.fused_representation.shape),
+        modality_weights=res.modality_weights,
     )

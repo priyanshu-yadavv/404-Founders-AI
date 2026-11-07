@@ -5,6 +5,55 @@ All notable changes to the 404 FOUNDERS project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to Phase-based Development Governance.
 
+## [Phase-08] - 2026-11-07
+
+### Added
+- **Unified Multimodal Architecture across 6 Modalities:**
+  - `MultimodalTextProcessor` (`multimodal/text/text_processor.py`): Native English and Hindi (Devanagari) script detection, sentence-aware overlapping document chunking, grounded context QA without fabrication, and structured entity/URL/email regex extraction.
+  - `ImageProcessor` (`multimodal/vision/image_processor.py`): Magic byte verification for PNG, JPEG, WEBP, and BMP headers; decompression-bomb protection (25M pixel ceiling, 25MB bound); spatial resizing to 224x224; and Vision Transformer (ViT) patch extraction (196 patches of 16x16 with 768 dims).
+  - `AudioProcessor` (`multimodal/audio/audio_processor.py`): WAV (RIFF), MP3, FLAC, OGG, and M4A header validation; PCM normalization to float32 $[-1.0, 1.0]$; acoustic metrics (RMS energy, zero-crossing rate, SNR); and STFT spectrogram calculation (Hann window, 512 FFT points).
+  - `SpeechRecognitionEngine` (`multimodal/audio/speech_recognition.py`): Short-time RMS energy Voice Activity Detection (VAD), timestamped segment generation, and language classification for English and Hindi.
+  - `SpeechGenerationEngine` (`multimodal/audio/speech_generation.py`): Deterministic phonemic vocal-tract formant synthesis ($F_0$ pitch carrier + $F_1, F_2$ resonant frequencies); multi-language phoneme mapping for English and Hindi; direct generation of valid 16-bit PCM mono WAV bytes at 16,000 Hz; and browser-playable base64 Data URIs (`data:audio/wav;base64,...`).
+  - `VideoProcessor` (`multimodal/video/video_processor.py`): Memory-bounded streaming frame ingestion via OpenCV without full video decompression in RAM; uniform temporal sampling; Chi-Square histogram distance computation ($D_{\chi^2} > 5.0$) for automated scene transition detection; and scaled JPEG thumbnail generation.
+  - `DocumentProcessor` (`multimodal/documents/document_processor.py`): Multi-format parsing (PDF via `pypdf`, DOCX via `python-docx`, CSV, JSON, TXT, Markdown); structured table schema extraction; and automated prompt injection defense (`inspect_prompt_safety`).
+- **Hybrid Multi-Stage Multimodal Fusion Engine (`neural_architecture/fusion/multimodal_fusion.py`):**
+  - `EarlyFusionLayer`: Linear modality adapters, learned modality type embeddings (Text, Image, Audio, Video, Document), and sequence concatenation.
+  - `CrossModalAttentionFusion`: Multi-head cross-attention with pre-RMSNorm and LayerScale residual modulation ($\gamma = 0.1$).
+  - `LateFusionAggregator`: Adaptive softmax gating across pooled representation vectors.
+  - `MultimodalFusionEngine`: Orchestrates Early, Intermediate, and Late fusion with missing-modality resilience.
+- **Unified Modality Router (`multimodal/modality_router.py`):**
+  - Simultaneous detection across all active modalities in request payloads.
+  - Dynamic dispatching to specialized processors and integration with `CentralIntelligenceRouter`.
+- **Cross-Modal Context Manager (`multimodal/context_manager.py`):**
+  - Bounded 10-turn FIFO ring buffer tracking active media artifacts and summaries.
+  - Reverse chronological cross-modal coreference resolution (e.g. linking "the image" or "the document" to prior turns).
+- **REST API Endpoints (`api/rest/routes.py`, `api/rest/schemas.py`):**
+  - `GET /api/v1/multimodal/modalities`: Active modalities and supported formats.
+  - `POST /api/v1/multimodal/process`: Consolidated multimodal endpoint with optional fusion and speech synthesis.
+  - `POST /api/v1/multimodal/image`: Image validation, metadata, and ViT patch extraction.
+  - `POST /api/v1/multimodal/audio`: Audio waveform normalization, RMS, and STFT spectrogram.
+  - `POST /api/v1/multimodal/speech/recognize`: Speech-to-text with timestamped segments.
+  - `POST /api/v1/multimodal/speech/synthesize`: Text-to-speech formant synthesis producing playable WAV Data URIs.
+  - `POST /api/v1/multimodal/document`: Multi-format document extraction and injection security audit.
+  - `POST /api/v1/multimodal/fuse`: Early, Intermediate, or Late multimodal fusion tensor coordinator.
+- **Developer CLI Utility (`scripts/run_multimodal.py`):**
+  - Interactive and programmatic CLI with `--list-modalities`, `--image`, `--audio`, `--video`, `--document`, `--speech-tts`, `--fuse`, and `--json`.
+- **Warm Neutral Frontend Studio (`frontend/public/`):**
+  - Theme Engine: Warm Light Mode (`#F4F0E8`), Warm Dark Mode (`[data-theme="dark"]`), and System preference sync.
+  - Multimodal Studio View: Dedicated interactive workspace for Image, Audio & Speech, Video, Document, and Fusion.
+  - Chat Composer Attachment Tray: File upload buttons for Image, Audio, Video, and Document with preview pills and remove triggers.
+  - In-chat synthesized audio playback controls.
+- **7 Technical Architecture Manuals in `docs/`:**
+  - `docs/MULTIMODAL_INTELLIGENCE.md` (`DOC-MULTI-001`)
+  - `docs/IMAGE_PROCESSING.md` (`DOC-MULTI-002`)
+  - `docs/AUDIO_SPEECH_PROCESSING.md` (`DOC-MULTI-003`)
+  - `docs/VIDEO_INTELLIGENCE.md` (`DOC-MULTI-004`)
+  - `docs/DOCUMENT_INTELLIGENCE.md` (`DOC-MULTI-005`)
+  - `docs/MULTIMODAL_FUSION.md` (`DOC-MULTI-006`)
+  - `docs/CROSS_MODAL_CONTEXT.md` (`DOC-MULTI-007`)
+- **Comprehensive Test Suite (50 New Tests in `tests/multimodal/` and `tests/api/`):**
+  - Total test count expanded to 247 automated tests (100% passing on CPU).
+
 ## [Phase-07] - 2026-11-06
 
 ### Added
