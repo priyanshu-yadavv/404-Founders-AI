@@ -17,7 +17,7 @@ from core.exceptions import SecurityViolationError
 # Patterns identifying high-entropy secrets and authentication credentials
 SECRET_PATTERNS = [
     (r"-----BEGIN (?:RSA|EC|DSA|OPENSSH|PGP) PRIVATE KEY-----[\s\S]+?-----END (?:RSA|EC|DSA|OPENSSH|PGP) PRIVATE KEY-----", "[REDACTED_PRIVATE_KEY]"),
-    (r"\b(?:sk-[a-zA-Z0-9]{20,}|ghp_[a-zA-Z0-9]{36}|gho_[a-zA-Z0-9]{36}|glpat-[a-zA-Z0-9\-_]{20,})\b", "[REDACTED_API_TOKEN]"),
+    (r"\b(?:sk-[a-zA-Z0-9\-_]{20,}|ghp_[a-zA-Z0-9]{36}|gho_[a-zA-Z0-9]{36}|glpat-[a-zA-Z0-9\-_]{20,})\b", "[REDACTED_API_TOKEN]"),
     (r"\bAKIA[0-9A-Z]{16}\b", "[REDACTED_AWS_ACCESS_KEY]"),
     (r"\bBearer\s+[a-zA-Z0-9\-_]+\.[a-zA-Z0-9\-_]+\.[a-zA-Z0-9\-_]+\b", "[REDACTED_BEARER_JWT]"),
     (r"(?i)\b(?:password|passwd|secret|api_key|access_token|private_key)\s*[:=]\s*['\"][^'\"]{4,}['\"]", "[REDACTED_CREDENTIAL]"),
