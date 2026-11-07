@@ -5,6 +5,50 @@ All notable changes to the 404 FOUNDERS project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to Phase-based Development Governance.
 
+## [Phase-09] - 2026-11-07
+
+### Added
+- **8-Layer Cognitive Memory Hierarchy:**
+  - `ShortTermMemory` (`memory/short_term/short_term_memory.py`): Session-isolated conversational turns, subword token estimation, rolling turn limits, and automated context summarization milestones.
+  - `LongTermMemory` (`memory/long_term/long_term_memory.py`): SHA-256 content deduplication, version ancestry linking (`parent_version_id`), and user-authorized updates.
+  - `WorkingMemory` (`memory/working_memory.py`): Session- and task-isolated temporary memory, active objectives, intermediate computation checkpoints, dependency graphs, pending actions, and restart recovery.
+  - `EpisodicMemory` (`memory/episodic/episodic_memory.py`): Structured past event trajectory logs, chronological and similarity retrieval, and strict zero past-event fabrication guarantees (`verify_past_occurrence()`).
+  - `KnowledgeMemory` (`memory/knowledge/knowledge_memory.py`): Structured fact propositions $(Subject \xrightarrow{Predicate} Object)$, source attributions, epistemic confidence levels, directed semantic links (`memory_relationships`), and strict differentiation between `VERIFIED_FACT`, `UNVERIFIED_CLAIM`, and `USER_STATED`.
+  - `UserPreferenceMemory` (`memory/user_preferences.py`): Inspectable and editable user preferences (`communication_style`, `response_length`, `technical_depth`, `code_preference`, `explanation_mode`) with deterministic system fallbacks.
+  - `PersonalizationEngine` (`memory/personalization/personalization_engine.py`): Derives generation format directives from user preferences without deceptive manipulation.
+  - `ContextualMemoryEngine` (`memory/contextual_memory.py`): Dynamically synthesizes working tasks, conversational history, retrieved knowledge, and personalization directives into prompt context bounded by strict token budgets.
+- **Hybrid Memory Retrieval Engine (`memory/retrieval/retrieval_engine.py`):**
+  - Multi-dimensional scoring formula: $S(d, q) = 0.50 \cdot S_{lex} + 0.20 \cdot \text{imp} + 0.15 \cdot \text{conf} + 0.15 \cdot e^{-\lambda \cdot \Delta t}$.
+  - BM25-style lexical term matching with sub-linear frequency scaling and stopword suppression.
+  - Deterministic fallback ranking when queries are empty or ambient.
+  - Strict tenant isolation and cross-user permission verification.
+- **Memory Consolidation & Conflict Detection Engine (`memory/consolidation/consolidation_engine.py`):**
+  - Automated deduplication for near-identical records ($\ge 0.88$ sequence similarity) archiving older records and creating `DUPLICATE_OF` links.
+  - Contradiction detection flagging incompatible assertions with `CONFLICT_DETECTED` and `CONTRADICTS` links.
+  - Invariant: Conflicting user statements are NEVER silently overwritten.
+- **Memory Security, Privacy & Sanitization (`memory/security.py`):**
+  - Synchronous secret scrubbing pipeline redacting private keys, API tokens (`sk-`, `ghp_`, `glpat-`), AWS credentials (`AKIA...`), bearer JWTs, passwords, and connection URIs.
+  - Strict cross-tenant isolation raising `SecurityViolationError`.
+  - Immutable memory audit log table (`memory_audit_logs`).
+- **Normalized Relational SQLite Database Architecture (`database/`):**
+  - Schema migrations engine applying normalized DDL with foreign keys, WAL mode, and 7 targeted performance indexes.
+  - Thread-safe singleton connection manager (`DatabaseManager`).
+- **10-Stage Controlled Continual Learning Architecture (`learning/`):**
+  - `FeedbackSystem` (`learning/feedback/feedback_system.py`): Feedback recording, rating validation, and curation for offline dataset preparation.
+  - `ControlledLearningPipeline` (`learning/continual/learning_pipeline.py`): 10-stage offline lifecycle (Feedback Collection, Feedback Validation, Data Curation, Dataset Prep, Job Config, Baseline Eval, Regression Tests, Model Versioning, Governance Approval Gate, Controlled Deployment).
+  - Strict invariant: User feedback never alters foundation model weights online or directly.
+- **FastAPI REST Endpoints (`api/rest/routes.py`, `schemas.py`):**
+  - Endpoints for memory records CRUD, short-term history, working memory tasks, episodic events, user preferences, hybrid retrieval, consolidation, context assembly, feedback submissions, and 10-stage continual learning pipeline orchestration.
+- **Warm Neutral Frontend Interface (`frontend/public/`):**
+  - Dedicated memory management view (`#view-memory`) with memory retrieval toggle, search/filtering, telemetry vitals, inspectable/editable preferences, memory records table with status badges and deletion triggers, and 10-stage visualizer.
+- **4 Technical Architecture Manuals in `docs/`:**
+  - `docs/ADVANCED_MEMORY_SYSTEM.md` (`DOC-MEM-001`)
+  - `docs/MEMORY_RETRIEVAL_CONSOLIDATION.md` (`DOC-MEM-002`)
+  - `docs/CONTINUAL_LEARNING_PIPELINE.md` (`DOC-MEM-003`)
+  - `docs/MEMORY_PRIVACY_SECURITY.md` (`DOC-MEM-004`)
+- **Automated Test Suite:**
+  - Added 23 comprehensive tests across 5 test modules (`tests/memory/test_security_sanitization.py`, `tests/memory/test_memory_layers.py`, `tests/memory/test_retrieval_consolidation.py`, `tests/learning/test_continual_learning.py`, `tests/api/test_memory_endpoints.py`). Total repository tests: **270 passed in 6.72s**.
+
 ## [Phase-08] - 2026-11-07
 
 ### Added

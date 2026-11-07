@@ -143,8 +143,8 @@ The system operates across two core modes:
 ├── configs/                  # YAML system configurations, tokenizer & cluster tiers
 ├── frontend/                 # Client interfaces (React / Next.js / Tauri)
 ├── scripts/                  # Developer CLI tools (system, gpu, env, storage, tokenizer, training, intelligence)
-├── tests/                    # 197 automated tests covering all subsystems
-└── docs/                     # 37 exhaustive technical architecture manuals
+├── tests/                    # 270 automated tests covering all subsystems
+└── docs/                     # 48 exhaustive technical architecture manuals
 ```
 
 ---
@@ -298,11 +298,17 @@ Complete architectural specifications are maintained in [`docs/`](docs/):
 32. [**Multimodal Fusion Engine**](docs/MULTIMODAL_FUSION.md) (`DOC-MULTI-006`): Early (modality embeddings), Intermediate (cross-modal attention + LayerScale), and Late (adaptive softmax gating) fusion layers.
 33. [**Cross-Modal Context Manager**](docs/CROSS_MODAL_CONTEXT.md) (`DOC-MULTI-007`): Multi-turn conversational memory, bounded 10-turn ring buffer, and reverse chronological coreference resolution.
 
+### Advanced Memory & Continual Learning Architecture (Phase 09)
+34. [**Advanced Multi-Layer Memory Architecture**](docs/ADVANCED_MEMORY_SYSTEM.md) (`DOC-MEM-001`): 8-layer cognitive storage system (Short-Term, Working, Long-Term, Episodic, Knowledge, User Preferences, Contextual, Retrieval) with SQLite WAL and referential integrity.
+35. [**Memory Retrieval & Consolidation Engine**](docs/MEMORY_RETRIEVAL_CONSOLIDATION.md) (`DOC-MEM-002`): Hybrid BM25 lexical match, exponential recency decay $e^{-\lambda \cdot \Delta t}$, deterministic fallback, near-duplicate merging, and contradiction flagging without silent overwrites.
+36. [**Controlled Continual Learning Pipeline**](docs/CONTINUAL_LEARNING_PIPELINE.md) (`DOC-MEM-003`): 10-stage offline learning lifecycle with human governance approval gates; strict invariant prohibiting direct online weight self-modification.
+37. [**Memory Privacy, Security & Secret Sanitization**](docs/MEMORY_PRIVACY_SECURITY.md) (`DOC-MEM-004`): Zero-credential scrubbing pipeline, cross-user tenant boundary enforcement, non-executable data invariant, zero past-event fabrication guard, and append-only audit ledger.
+
 ### System Architecture & Governance (Phase 01 & 02)
-34. [**System Architecture**](docs/SYSTEM_ARCHITECTURE.md) (`DOC-ARCH-001`): Operating modes, orchestration, and data flow.
-35. [**Neural Architecture**](docs/NEURAL_ARCHITECTURE.md) (`DOC-ARCH-002`): Layers, RoPE, SwiGLU, MMA attention, and MoE routing.
-36. [**Multimodal Architecture**](docs/MULTIMODAL_ARCHITECTURE.md) (`DOC-ARCH-003`): Vision, audio, video, text, and documents fusion.
-37. [**Memory Architecture**](docs/MEMORY_ARCHITECTURE.md) (`DOC-ARCH-004`): Multi-tier memory, infinite context, and consolidation.
+38. [**System Architecture**](docs/SYSTEM_ARCHITECTURE.md) (`DOC-ARCH-001`): Operating modes, orchestration, and data flow.
+39. [**Neural Architecture**](docs/NEURAL_ARCHITECTURE.md) (`DOC-ARCH-002`): Layers, RoPE, SwiGLU, MMA attention, and MoE routing.
+40. [**Multimodal Architecture**](docs/MULTIMODAL_ARCHITECTURE.md) (`DOC-ARCH-003`): Vision, audio, video, text, and documents fusion.
+41. [**Memory Architecture**](docs/MEMORY_ARCHITECTURE.md) (`DOC-ARCH-004`): Multi-tier memory, infinite context, and consolidation.
 38. [**Personal AI Architecture**](docs/PERSONAL_AI_ARCHITECTURE.md) (`DOC-ARCH-005`): OS copilot, telemetry, coding, and defensive cybersecurity.
 39. [**API Architecture**](docs/API_ARCHITECTURE.md) (`DOC-ARCH-006`): REST, WebSocket, and gRPC protocol specifications.
 40. [**Security Architecture**](docs/SECURITY_ARCHITECTURE.md) (`DOC-ARCH-007`): Threat model, 4-tier permissions, audit logging, and sandbox.
@@ -374,7 +380,54 @@ flowchart TD
 
 ---
 
-## 10. Development Roadmap & Phase Status
+## 10. Advanced Memory & Controlled Learning Architecture (Phase 09)
+
+Phase 09 establishes the 8-layer cognitive memory hierarchy, confidential data sanitization, hybrid retrieval with exponential recency decay, and a 10-stage offline continual learning pipeline.
+
+```mermaid
+flowchart TD
+    PromptQuery["Prompt Query & User Context"] --> CME["Contextual Memory Engine<br/>Token-Budget Bounded Prompt Synthesis"]
+    
+    subgraph LAYERS ["Cognitive Memory Layers"]
+        STM["Short-Term Memory<br/>Rolling turns & auto-aging summarization"]
+        WM["Working Memory<br/>Active tasks & crash recovery"]
+        LTM["Long-Term Memory<br/>SHA-256 dedup & version ancestry"]
+        EPI["Episodic Memory<br/>ZERO past-event fabrication"]
+        KM["Knowledge Memory<br/>Verified facts vs user claims"]
+        PREF["User Preferences<br/>Inspectable & editable styles"]
+    end
+
+    subgraph RETRIEVAL ["Hybrid Retrieval & Consolidation"]
+        HRE["Hybrid Retrieval Engine<br/>S = 0.50·S_lex + 0.20·imp + 0.15·conf + 0.15·e^(-λ·Δt)"]
+        MCE["Consolidation & Conflict Detection<br/>Never silently overwrite; flag CONFLICT_DETECTED"]
+    end
+
+    subgraph LEARNING ["Continual Learning Architecture (Offline)"]
+        FB["Feedback System<br/>Ratings, corrections, & bug reports"]
+        CLP["10-Stage Controlled Learning Pipeline<br/>Collection ➔ Validation ➔ Curation ➔ Dataset Prep ➔<br/>Job Config ➔ Baseline Eval ➔ Regression Tests ➔<br/>Versioning ➔ Approval Gate ➔ Deployment"]
+    end
+
+    CME --> HRE
+    HRE --> LTM
+    HRE --> KM
+    HRE --> EPI
+    CME --> STM
+    CME --> WM
+    CME --> PREF
+    
+    FB --> CLP
+    CLP -.->|Strictly Offline; Zero Online Weight Mutation| NeuralCore["Neural Core Foundation Checkpoint"]
+```
+
+### Core Invariants & Protections
+1. **Zero-Credential Scrubbing:** `MemorySecurityManager` synchronously scrubs private keys, tokens (`sk-`, `ghp_`), AWS keys, and passwords before database write operations.
+2. **Zero Past-Event Fabrication:** Episodic memory inquiries verify actual entries in `episodic_events`. If unrecorded, `verify_past_occurrence()` strictly reports non-occurrence rather than fabricating history.
+3. **No Silent Overwriting:** Contradictory user assertions are flagged as `CONFLICT_DETECTED` with provenance trails rather than silently overwriting past knowledge.
+4. **Zero Online Weight Modification:** Continual learning is strictly an offline 10-stage gated process with mandatory human governance sign-off.
+
+---
+
+## 11. Development Roadmap & Phase Status
 
 | Phase | Phase Name | Status |
 |---|---|---|
@@ -385,11 +438,12 @@ flowchart TD
 | **Phase 05** | Training Infrastructure & GPU Cluster Architecture | **Completed** |
 | **Phase 06** | Foundation Model Pretraining from Random Initialization | **Completed** |
 | **Phase 07** | Modular Intelligence Modules | **Completed** |
-| **Phase 08** | **Multimodal Intelligence & Cross-Modal Fusion** | **Completed (Review Pending)** |
+| **Phase 08** | Multimodal Intelligence & Cross-Modal Fusion | **Completed** |
+| **Phase 09** | **Advanced Memory & Controlled Learning Architecture** | **Completed (Review Pending)** |
 
 ---
 
-## 11. Quickstart, Localhost Testing & Verification
+## 12. Quickstart, Localhost Testing & Verification
 
 ### Localhost Application Execution
 

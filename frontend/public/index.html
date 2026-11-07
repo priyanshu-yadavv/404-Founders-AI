@@ -464,69 +464,204 @@ tests/api/test_rest_api.py ......                                [100%]
 
         <!-- View 6: Personal AI & Memory -->
         <section id="view-memory" class="view-panel">
-          <div class="section-grid">
+          <!-- Top Memory Controls Bar -->
+          <div class="card" style="margin-bottom: 16px;">
+            <div class="card-header" style="margin-bottom: 12px;">
+              <div>
+                <h3>Multi-Layer Memory Control Center</h3>
+                <span class="card-tag">Phase 09 Architecture</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; color: var(--text-secondary);">
+                  <input type="checkbox" id="memToggleRetrieval" checked style="accent-color: var(--accent-primary);">
+                  Enable Memory Retrieval
+                </label>
+                <button id="btnOpenSaveMemoryModal" class="btn-primary" style="padding: 6px 12px; font-size: 12px;">+ Save Memory</button>
+                <button id="btnRunConsolidation" class="btn-secondary" style="padding: 6px 12px; font-size: 12px;">Run Consolidation</button>
+                <button id="btnClearAllMemory" class="btn-secondary" style="padding: 6px 12px; font-size: 12px; color: var(--status-error); border-color: var(--status-error);">Clear Memory</button>
+              </div>
+            </div>
+
+            <!-- Search and Filter Bar -->
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <input type="text" id="memSearchQuery" class="text-area" style="height: 36px; padding: 6px 12px; flex: 1; resize: none;" placeholder="Search persistent memories, knowledge facts, and episodic events...">
+              <select id="memLayerFilter" class="text-area" style="width: 140px; height: 36px; padding: 4px 8px;">
+                <option value="">All Layers</option>
+                <option value="LONG_TERM">Long-Term</option>
+                <option value="KNOWLEDGE">Knowledge</option>
+                <option value="SHORT_TERM">Short-Term</option>
+              </select>
+              <button id="btnSearchMemory" class="btn-secondary" style="height: 36px; padding: 0 16px;">Search</button>
+              <button id="btnResetMemorySearch" class="btn-secondary" style="height: 36px; padding: 0 12px;">Reset</button>
+            </div>
+          </div>
+
+          <!-- Memory Telemetry & Statistics Grid -->
+          <div class="section-grid" style="margin-bottom: 16px;">
             <div class="card">
               <div class="card-header">
-                <h3>Multi-Layer Memory Hierarchy</h3>
-                <span class="card-tag">Architecture</span>
+                <h3>Memory Subsystem Telemetry</h3>
+                <span class="card-tag">Measured Vitals</span>
               </div>
               <div class="kv-list">
                 <div class="kv-item">
-                  <span class="kv-key">Working Memory</span>
-                  <span class="kv-val">Transformer Attention KV-Cache</span>
+                  <span class="kv-key">Active Stored Records</span>
+                  <span class="kv-val accent" id="memStatRecordCount">--</span>
                 </div>
                 <div class="kv-item">
-                  <span class="kv-key">Episodic Memory</span>
-                  <span class="kv-val">Session Interactions & Diagnostic Log</span>
+                  <span class="kv-key">Working Memory Tasks</span>
+                  <span class="kv-val" id="memStatWorkingTasks">--</span>
                 </div>
                 <div class="kv-item">
-                  <span class="kv-key">Semantic Memory</span>
-                  <span class="kv-val">Vector Embeddings & Retrieval Indices</span>
+                  <span class="kv-key">Flagged Conflicts</span>
+                  <span class="kv-val" id="memStatConflicts">0</span>
                 </div>
                 <div class="kv-item">
-                  <span class="kv-key">Symbolic Memory</span>
-                  <span class="kv-val">Structured System Entity Graph</span>
+                  <span class="kv-key">Data Sovereignty</span>
+                  <span class="kv-val accent">100% Local SQLite WAL</span>
                 </div>
               </div>
             </div>
 
+            <!-- User Personalization Directives -->
             <div class="card">
               <div class="card-header">
-                <h3>Personal AI Operating Boundaries</h3>
-                <span class="card-tag">Security & Privacy</span>
+                <h3>Personalization Engine</h3>
+                <span class="card-tag">Inspectable & Editable</span>
               </div>
-              <div class="kv-list">
-                <div class="kv-item">
-                  <span class="kv-key">Local Data Sovereignty</span>
-                  <span class="kv-val accent">100% On-Device Storage</span>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px; margin-bottom: 10px;">
+                <div>
+                  <label style="color: var(--text-secondary); display: block; margin-bottom: 2px;">Style</label>
+                  <select id="prefCommStyle" class="text-area" style="height: 28px; width: 100%; padding: 2px 6px;">
+                    <option value="balanced">Balanced</option>
+                    <option value="concise">Concise</option>
+                    <option value="detailed">Detailed</option>
+                    <option value="academic">Academic</option>
+                  </select>
                 </div>
-                <div class="kv-item">
-                  <span class="kv-key">External Network Egress</span>
-                  <span class="kv-val">Strict Sandbox Boundary</span>
+                <div>
+                  <label style="color: var(--text-secondary); display: block; margin-bottom: 2px;">Length</label>
+                  <select id="prefRespLength" class="text-area" style="height: 28px; width: 100%; padding: 2px 6px;">
+                    <option value="short">Short</option>
+                    <option value="medium">Medium</option>
+                    <option value="comprehensive">Comprehensive</option>
+                  </select>
                 </div>
-                <div class="kv-item">
-                  <span class="kv-key">System Control Mode</span>
-                  <span class="kv-val">Interactive Pairing (No Autonomous Sudo)</span>
+                <div>
+                  <label style="color: var(--text-secondary); display: block; margin-bottom: 2px;">Technical Depth</label>
+                  <select id="prefTechDepth" class="text-area" style="height: 28px; width: 100%; padding: 2px 6px;">
+                    <option value="beginner">Beginner</option>
+                    <option value="intermediate">Intermediate</option>
+                    <option value="expert">Expert</option>
+                  </select>
                 </div>
-                <div class="kv-item">
-                  <span class="kv-key">Memory Retention Policy</span>
-                  <span class="kv-val">Session-Bound & Configurable Persistent</span>
+                <div>
+                  <label style="color: var(--text-secondary); display: block; margin-bottom: 2px;">Code Preference</label>
+                  <select id="prefCodeLang" class="text-area" style="height: 28px; width: 100%; padding: 2px 6px;">
+                    <option value="python">Python</option>
+                    <option value="rust">Rust</option>
+                    <option value="typescript">TypeScript</option>
+                    <option value="cpp">C++</option>
+                  </select>
                 </div>
+              </div>
+              <div style="display: flex; justify-content: flex-end;">
+                <button id="btnSavePreferences" class="btn-secondary" style="padding: 4px 10px; font-size: 11px;">Update Preferences</button>
               </div>
             </div>
           </div>
 
+          <!-- Stored Records Table -->
+          <div class="card" style="margin-bottom: 16px;">
+            <div class="card-header">
+              <h3>Memory Records & Knowledge Store</h3>
+              <span class="card-tag" id="memRecordsCounter">0 Records</span>
+            </div>
+            <div style="overflow-x: auto;">
+              <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;">
+                <thead>
+                  <tr style="border-bottom: 1px solid var(--border); color: var(--text-secondary);">
+                    <th style="padding: 8px 6px;">ID</th>
+                    <th style="padding: 8px 6px;">Layer</th>
+                    <th style="padding: 8px 6px;">Content</th>
+                    <th style="padding: 8px 6px;">Importance</th>
+                    <th style="padding: 8px 6px;">Ver</th>
+                    <th style="padding: 8px 6px;">Status</th>
+                    <th style="padding: 8px 6px; text-align: right;">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="memRecordsTableBody">
+                  <tr>
+                    <td colspan="7" style="padding: 16px; text-align: center; color: var(--text-muted);">
+                      Loading memory records from database...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- 10-Stage Continual Learning Visualizer -->
           <div class="card">
             <div class="card-header">
-              <h3>Active Memory Subsystem Status</h3>
-              <span class="card-tag">MultiLayerMemory Module</span>
+              <div>
+                <h3>Controlled Continual Learning Pipeline</h3>
+                <span class="card-tag">10-Stage Offline Gated Workflow</span>
+              </div>
+              <div>
+                <button id="btnTriggerLearningJob" class="btn-secondary" style="padding: 6px 12px; font-size: 12px;">Trigger Learning Cycle</button>
+              </div>
             </div>
-            <div class="code-block">
-Memory Module: core.neural.memory.MultiLayerMemory
-Status: ACTIVE
-Allocation: CPU Ring Buffer
-Capacity: Dynamic ceiling (bound to safe memory budget: 3.50 GB)
-State: Clean initialization, zero persistent leak detected.
+            <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px;">
+              <strong>Strict Invariant:</strong> User feedback never alters foundation weights directly online. Weight updates require this offline 10-stage reproducible process and governance approval.
+            </p>
+
+            <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; font-size: 11px; margin-bottom: 12px;">
+              <div class="card" style="padding: 8px; background-color: var(--surface-secondary);" id="stageCard1">
+                <strong>1. Feedback Collection</strong>
+                <div style="color: var(--text-muted); font-size: 10px;">Gather validated items</div>
+              </div>
+              <div class="card" style="padding: 8px; background-color: var(--surface-secondary);" id="stageCard2">
+                <strong>2. Validation</strong>
+                <div style="color: var(--text-muted); font-size: 10px;">Quality & formatting gates</div>
+              </div>
+              <div class="card" style="padding: 8px; background-color: var(--surface-secondary);" id="stageCard3">
+                <strong>3. Data Curation</strong>
+                <div style="color: var(--text-muted); font-size: 10px;">Secret & PII scrubbing</div>
+              </div>
+              <div class="card" style="padding: 8px; background-color: var(--surface-secondary);" id="stageCard4">
+                <strong>4. Dataset Prep</strong>
+                <div style="color: var(--text-muted); font-size: 10px;">Instruction pair tokens</div>
+              </div>
+              <div class="card" style="padding: 8px; background-color: var(--surface-secondary);" id="stageCard5">
+                <strong>5. Job Config</strong>
+                <div style="color: var(--text-muted); font-size: 10px;">EWC regularized offline job</div>
+              </div>
+              <div class="card" style="padding: 8px; background-color: var(--surface-secondary);" id="stageCard6">
+                <strong>6. Baseline Eval</strong>
+                <div style="color: var(--text-muted); font-size: 10px;">Capability metrics</div>
+              </div>
+              <div class="card" style="padding: 8px; background-color: var(--surface-secondary);" id="stageCard7">
+                <strong>7. Regression Tests</strong>
+                <div style="color: var(--text-muted); font-size: 10px;">Catastrophic forgetting check</div>
+              </div>
+              <div class="card" style="padding: 8px; background-color: var(--surface-secondary);" id="stageCard8">
+                <strong>8. Model Versioning</strong>
+                <div style="color: var(--text-muted); font-size: 10px;">Artifact checksum tagging</div>
+              </div>
+              <div class="card" style="padding: 8px; background-color: var(--surface-secondary);" id="stageCard9">
+                <strong>9. Approval Gate</strong>
+                <div style="color: var(--text-muted); font-size: 10px;">Human governance sign-off</div>
+              </div>
+              <div class="card" style="padding: 8px; background-color: var(--surface-secondary);" id="stageCard10">
+                <strong>10. Deployment</strong>
+                <div style="color: var(--text-muted); font-size: 10px;">Controlled canary release</div>
+              </div>
+            </div>
+
+            <div id="learningPipelineStatusBox" class="code-block" style="font-size: 11px;">
+Pipeline Status: IDLE
+Awaiting trigger for next offline continual learning cycle.
             </div>
           </div>
         </section>

@@ -635,3 +635,90 @@ Authored 7 comprehensive technical manuals in `docs/`:
   - `tests/api/test_multimodal_endpoints.py` (9 tests)
 - Executed entire test suite: **247 passed in 5.24s (100% success rate on CPU)**.
 - Staged all Phase 08 files awaiting user review and approval to commit.
+
+
+---
+
+## [Phase 09] — 2026-11-07: Advanced Memory & Controlled Learning Architecture
+
+### 1. Architectural Strategy & Design
+- Designed and built the 8-layer cognitive memory hierarchy supporting both General Intelligence Mode and Personal AI Mode.
+- Implemented normalized SQLite database architecture with WAL mode, foreign keys, and 7 targeted performance indexes.
+- Enforced strict zero-credential secret scrubbing (`MemorySecurityManager.scrub_secrets()`) preventing credentials, tokens, and private keys from entering durable storage.
+- Established strict zero past-event fabrication guarantees in Episodic Memory.
+- Implemented epistemic differentiation in Knowledge Memory (`VERIFIED_FACT`, `UNVERIFIED_CLAIM`, `USER_STATED`).
+- Implemented hybrid memory retrieval with BM25-style lexical scoring, metadata filtering, and exponential recency decay $S_{rec} = e^{-\lambda \cdot \Delta t}$.
+- Implemented memory consolidation and conflict detection: automated duplicate merging and contradiction flagging (`CONFLICT_DETECTED`) without silent overwriting.
+- Built the 10-stage offline continual learning pipeline (`ControlledLearningPipeline`) ensuring user feedback NEVER alters foundation model weights online or directly.
+
+### 2. Implemented Subsystems & Modules
+- **Database Engine (`database/schema.py`, `database/connection.py`, `database/__init__.py`):**
+  - Managed migrations applying DDL for `schema_migrations`, `memory_records`, `memory_relationships`, `episodic_events`, `working_memory_tasks`, `user_preferences`, `feedback_records`, and `memory_audit_logs`.
+  - Thread-safe `DatabaseManager` singleton with connection context manager and WAL pragma configuration.
+- **Memory Security (`memory/security.py`):**
+  - Regex sanitization pipeline scrubbing private keys, API tokens (`sk-`, `ghp_`, `glpat-`), AWS keys (`AKIA...`), bearer JWTs, and database URIs.
+  - Cross-user tenant boundary validator raising `SecurityViolationError`.
+  - Append-only immutable memory audit logger.
+- **Short-Term Memory (`memory/short_term/short_term_memory.py`):**
+  - Rolling turn window, subword token counting, and automatic aging summarization milestones.
+- **Long-Term Memory (`memory/long_term/long_term_memory.py`):**
+  - SHA-256 content deduplication, version ancestry linking (`parent_version_id`), and user-controlled updates.
+- **Working Memory (`memory/working_memory.py`):**
+  - Session/task scratchpad with active objectives, intermediate results, pending actions, and restart recovery.
+- **Episodic Memory (`memory/episodic/episodic_memory.py`):**
+  - Event trajectory logging, chronological/keyword search, and anti-fabrication validator.
+- **Semantic & Knowledge Memory (`memory/knowledge/knowledge_memory.py`):**
+  - Epistemic claim types (`ClaimType`), proposition triples, and directed relational links (`memory_relationships`).
+- **User Preference Memory (`memory/user_preferences.py`):**
+  - Inspectable and editable user preferences with deterministic system defaults.
+- **Hybrid Retrieval Engine (`memory/retrieval/retrieval_engine.py`):**
+  - Multi-dimensional scoring combining lexical matching, importance, confidence, and recency decay.
+- **Memory Consolidation Engine (`memory/consolidation/consolidation_engine.py`):**
+  - Duplicate resolution and contradiction detection flagging `CONFLICT_DETECTED` status.
+- **Personalization Engine (`memory/personalization/personalization_engine.py`):**
+  - System prompt directive formulation from authorized preferences.
+- **Contextual Memory Engine (`memory/contextual_memory.py`):**
+  - Multi-layer prompt context synthesis respecting strict token budget ceilings.
+- **Feedback Subsystem (`learning/feedback/feedback_system.py`):**
+  - Feedback capture, categorization, validation, and dataset curation.
+- **Controlled Continual Learning Pipeline (`learning/continual/learning_pipeline.py`):**
+  - 10-stage offline learning lifecycle (Collection, Validation, Curation, Dataset Prep, Job Config, Baseline Eval, Regression Tests, Versioning, Approval Gate, Controlled Canary Deployment).
+
+### 3. REST API & Lifecycle Integration
+- Updated `api/rest/schemas.py`, `api/rest/routes.py`, and `api/rest/app.py`:
+  - `POST /api/v1/memory/records` & `GET /api/v1/memory/records`: Save and list persistent memory records.
+  - `PUT /api/v1/memory/records/{id}` & `DELETE /api/v1/memory/records/{id}`: Versioned update and delete.
+  - `POST /api/v1/memory/short-term`, `GET /api/v1/memory/short-term`, `DELETE /api/v1/memory/short-term`: Conversation turns.
+  - `POST /api/v1/memory/working` & `GET /api/v1/memory/working`: Active working tasks.
+  - `POST /api/v1/memory/episodic` & `GET /api/v1/memory/episodic`: Event logs and search.
+  - `GET /api/v1/memory/preferences`, `POST /api/v1/memory/preferences`, `DELETE /api/v1/memory/preferences/{key}`: User preferences.
+  - `POST /api/v1/memory/retrieve`: Hybrid retrieval with recency decay.
+  - `POST /api/v1/memory/consolidate`: Memory consolidation pass.
+  - `POST /api/v1/memory/context`: Multi-layer prompt context assembly.
+  - `POST /api/v1/learning/feedback`, `GET /api/v1/learning/feedback`, `POST /api/v1/learning/feedback/{id}/validate`: Feedback lifecycle.
+  - `POST /api/v1/learning/jobs`, `GET /api/v1/learning/jobs/{id}`, `POST /api/v1/learning/jobs/{id}/run-pipeline`, `POST /api/v1/learning/jobs/{id}/approve`: 10-stage continual learning pipeline orchestration.
+
+### 4. Frontend Integration
+- Redesigned `#view-memory` in `frontend/public/index.html` and `frontend/public/app.js`:
+  - Memory Retrieval toggle and keyword/layer search bar.
+  - Live memory telemetry vitals (active records, working tasks, flagged conflicts, local sovereignty).
+  - Inspectable and editable user preferences (style, length, technical depth, code language).
+  - Stored memory records table with status badges and deletion actions.
+  - 10-stage continual learning visualizer cards with interactive pipeline trigger and status reporting.
+
+### 5. Documentation Authored
+Authored 4 comprehensive technical manuals in `docs/`:
+- [`docs/ADVANCED_MEMORY_SYSTEM.md`](docs/ADVANCED_MEMORY_SYSTEM.md) (`DOC-MEM-001`)
+- [`docs/MEMORY_RETRIEVAL_CONSOLIDATION.md`](docs/MEMORY_RETRIEVAL_CONSOLIDATION.md) (`DOC-MEM-002`)
+- [`docs/CONTINUAL_LEARNING_PIPELINE.md`](docs/CONTINUAL_LEARNING_PIPELINE.md) (`DOC-MEM-003`)
+- [`docs/MEMORY_PRIVACY_SECURITY.md`](docs/MEMORY_PRIVACY_SECURITY.md) (`DOC-MEM-004`)
+
+### 6. Automated Testing & Verification
+- Authored 23 new tests across 5 test modules:
+  - `tests/memory/test_security_sanitization.py` (3 tests)
+  - `tests/memory/test_memory_layers.py` (6 tests)
+  - `tests/memory/test_retrieval_consolidation.py` (4 tests)
+  - `tests/learning/test_continual_learning.py` (3 tests)
+  - `tests/api/test_memory_endpoints.py` (7 tests)
+- Executed entire test suite: **270 passed in 6.72s (100% success rate on CPU)**.
+- Staged all Phase 09 files awaiting user review and approval to commit.

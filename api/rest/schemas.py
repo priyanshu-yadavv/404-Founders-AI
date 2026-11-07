@@ -398,3 +398,265 @@ class MultimodalFuseResponse(BaseModel):
     missing_modalities: List[str]
     fused_tensor_shape: List[int]
     modality_weights: Dict[str, float]
+
+
+# ==============================================================================
+# PHASE 09 — ADVANCED MEMORY & CONTROLLED LEARNING SCHEMAS
+# ==============================================================================
+
+
+class MemoryRecordCreateRequest(BaseModel):
+    """Save a record to long-term or knowledge memory."""
+    user_id: str = Field(..., min_length=1, description="Tenant user ID")
+    content: str = Field(..., min_length=1, description="Memory text content")
+    summary: Optional[str] = Field(None, description="Optional concise summary")
+    memory_layer: str = Field("LONG_TERM", description="Target layer (LONG_TERM or KNOWLEDGE)")
+    importance: float = Field(0.5, ge=0.0, le=1.0, description="Importance weighting")
+    confidence: float = Field(1.0, ge=0.0, le=1.0, description="Confidence score")
+    is_confirmed_by_user: bool = Field(False, description="Whether explicitly verified by user")
+    source_type: str = Field("user_explicit", description="Source provenance attribution")
+    tags: List[str] = Field(default_factory=list, description="Categorical tags")
+
+
+class MemoryRecordResponse(BaseModel):
+    """Memory record metadata."""
+    record_id: str
+    user_id: str
+    content: str
+    summary: str
+    importance: float
+    confidence: float
+    is_confirmed_by_user: bool
+    version: int
+    parent_version_id: Optional[str]
+    source_type: str
+    tags: List[str]
+    created_at: str
+    updated_at: str
+    status: str
+
+
+class MemoryRecordUpdateRequest(BaseModel):
+    """Update an existing memory record."""
+    user_id: str = Field(..., min_length=1, description="Tenant user ID")
+    new_content: Optional[str] = Field(None, description="Updated content")
+    new_summary: Optional[str] = Field(None, description="Updated summary")
+    importance: Optional[float] = Field(None, ge=0.0, le=1.0)
+    confidence: Optional[float] = Field(None, ge=0.0, le=1.0)
+    is_confirmed_by_user: Optional[bool] = None
+    tags: Optional[List[str]] = None
+
+
+class ShortTermMessageRequest(BaseModel):
+    """Add a message turn to short-term conversational context."""
+    user_id: str = Field(..., min_length=1)
+    session_id: str = Field(..., min_length=1)
+    role: str = Field("user", description="Role: user, assistant, system")
+    content: str = Field(..., min_length=1)
+
+
+class ShortTermMessageResponse(BaseModel):
+    """Conversational message turn."""
+    message_id: str
+    user_id: str
+    session_id: str
+    role: str
+    content: str
+    timestamp: str
+    token_count_estimate: int
+
+
+class WorkingTaskStartRequest(BaseModel):
+    """Initialize or resume an active working task."""
+    session_id: str = Field(..., min_length=1)
+    task_id: str = Field(..., min_length=1)
+    task_name: str = Field(..., min_length=1)
+    objectives: List[str] = Field(default_factory=list)
+    dependencies: List[str] = Field(default_factory=list)
+    initial_results: Dict[str, Any] = Field(default_factory=dict)
+
+
+class WorkingTaskResponse(BaseModel):
+    """Working task representation."""
+    session_id: str
+    task_id: str
+    task_name: str
+    active_objectives: List[str]
+    intermediate_results: Dict[str, Any]
+    dependencies: List[str]
+    pending_actions: List[Dict[str, Any]]
+    status: str
+    created_at: str
+    updated_at: str
+
+
+class WorkingTaskUpdateRequest(BaseModel):
+    """Update progress for an active working task."""
+    session_id: str = Field(..., min_length=1)
+    intermediate_results: Optional[Dict[str, Any]] = None
+    pending_actions: Optional[List[Dict[str, Any]]] = None
+    active_objectives: Optional[List[str]] = None
+    status: Optional[str] = None
+
+
+class EpisodicEventRequest(BaseModel):
+    """Record an episodic event log."""
+    user_id: str = Field(..., min_length=1)
+    event_description: str = Field(..., min_length=1)
+    session_id: Optional[str] = None
+    task_id: Optional[str] = None
+    context_summary: Optional[str] = None
+    outcome: Optional[str] = None
+    related_memory_ids: List[str] = Field(default_factory=list)
+    user_feedback: Optional[str] = None
+
+
+class EpisodicEventResponse(BaseModel):
+    """Episodic event log representation."""
+    event_id: str
+    user_id: str
+    session_id: Optional[str]
+    task_id: Optional[str]
+    event_description: str
+    context_summary: Optional[str]
+    outcome: Optional[str]
+    related_memory_ids: List[str]
+    user_feedback: Optional[str]
+    timestamp: str
+
+
+class UserPreferenceSetRequest(BaseModel):
+    """Set or update user preference."""
+    user_id: str = Field(..., min_length=1)
+    preference_key: str = Field(..., min_length=1)
+    preference_val: str = Field(..., min_length=1)
+    is_explicit: bool = Field(True)
+
+
+class MemoryRetrievalRequest(BaseModel):
+    """Multi-layer hybrid memory retrieval request."""
+    user_id: str = Field(..., min_length=1)
+    query: str = Field(..., description="Query terms for lexical/semantic matching")
+    memory_layer: Optional[str] = Field(None, description="Optional layer filter (LONG_TERM, KNOWLEDGE, SHORT_TERM)")
+    min_confidence: float = Field(0.0, ge=0.0, le=1.0)
+    limit: int = Field(10, ge=1, le=50)
+
+
+class ScoredMemoryResponse(BaseModel):
+    """Retrieved memory with scoring breakdown."""
+    record_id: str
+    user_id: str
+    memory_layer: str
+    content: str
+    summary: str
+    final_score: float
+    lexical_score: float
+    recency_score: float
+    importance_score: float
+    confidence_score: float
+    source_attribution: str
+    created_at: str
+    updated_at: str
+
+
+class ConsolidationRequest(BaseModel):
+    """Trigger memory consolidation and conflict detection."""
+    user_id: str = Field(..., min_length=1)
+
+
+class ConflictReportItem(BaseModel):
+    """Detected contradiction report."""
+    conflict_id: str
+    existing_record_id: str
+    conflicting_record_id: str
+    subject_area: str
+    existing_content: str
+    conflicting_content: str
+    resolution_status: str
+    detected_at: str
+
+
+class ConsolidationResponse(BaseModel):
+    """Consolidation pass summary."""
+    user_id: str
+    duplicates_resolved: int
+    conflicts_detected: List[ConflictReportItem]
+    records_merged: int
+    consolidated_at: str
+
+
+class ContextAssemblyRequest(BaseModel):
+    """Request to assemble dynamic prompt context from multi-layer memory."""
+    user_id: str = Field(..., min_length=1)
+    session_id: str = Field(..., min_length=1)
+    current_query: str = Field(..., min_length=1)
+    token_budget: int = Field(3000, ge=256, le=16384)
+
+
+class ContextAssemblyResponse(BaseModel):
+    """Assembled multi-layer context output."""
+    full_context_text: str
+    personalization_directive: str
+    active_tasks_count: int
+    retrieved_memories_count: int
+    conversation_turns_count: int
+    estimated_tokens: int
+    budget_limit: int
+
+
+class FeedbackSubmitRequest(BaseModel):
+    """User feedback submission request."""
+    user_id: str = Field(..., min_length=1)
+    feedback_type: str = Field("POSITIVE", description="POSITIVE, NEGATIVE, CORRECTION, ERROR_REPORT")
+    response_id: Optional[str] = None
+    task_id: Optional[str] = None
+    rating: Optional[int] = Field(None, ge=1, le=5)
+    suggested_correction: Optional[str] = None
+    category: str = Field("general", description="factual_accuracy, code_syntax, hallucination, formatting, etc.")
+    comment: Optional[str] = None
+
+
+class FeedbackResponse(BaseModel):
+    """Feedback record schema."""
+    feedback_id: str
+    user_id: str
+    response_id: Optional[str]
+    task_id: Optional[str]
+    feedback_type: str
+    rating: Optional[int]
+    suggested_correction: Optional[str]
+    category: str
+    comment: Optional[str]
+    status: str
+    created_at: str
+
+
+class FeedbackValidateRequest(BaseModel):
+    """Validate or reject feedback entry."""
+    is_valid: bool
+    notes: Optional[str] = None
+
+
+class LearningJobCreateRequest(BaseModel):
+    """Create a 10-stage continual learning pipeline job."""
+    target_version: str = Field(..., min_length=1, description="Target model version identifier")
+
+
+class LearningJobResponse(BaseModel):
+    """Continual learning pipeline job status."""
+    job_id: str
+    current_stage: str
+    status: str
+    target_version: str
+    dataset_manifest_hash: Optional[str]
+    stage_history_count: int
+    is_approved: bool
+    created_at: str
+    updated_at: str
+
+
+class LearningJobApproveRequest(BaseModel):
+    """Governance sign-off approval request."""
+    approver: str = Field(..., min_length=1)
+    approved: bool
+    reason: str = Field("", description="Governance approval explanation")

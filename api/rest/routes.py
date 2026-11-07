@@ -21,10 +21,20 @@ from api.rest.schemas import (
     CodingAnalysisResponse,
     CommandValidationRequest,
     CommandValidationResponse,
+    ConflictReportItem,
+    ConsolidationRequest,
+    ConsolidationResponse,
+    ContextAssemblyRequest,
+    ContextAssemblyResponse,
     DecodeRequest,
     DecodeResponse,
     DocumentProcessRequest,
     DocumentProcessResponse,
+    EpisodicEventRequest,
+    EpisodicEventResponse,
+    FeedbackResponse,
+    FeedbackSubmitRequest,
+    FeedbackValidateRequest,
     HealthResponse,
     ImageProcessRequest,
     ImageProcessResponse,
@@ -32,10 +42,17 @@ from api.rest.schemas import (
     InferenceResponse,
     IntelligenceQueryRequest,
     IntelligenceQueryResponse,
+    LearningJobApproveRequest,
+    LearningJobCreateRequest,
+    LearningJobResponse,
     LogicalReasoningRequest,
     LogicalReasoningResponse,
     MathReasoningRequest,
     MathReasoningResponse,
+    MemoryRecordCreateRequest,
+    MemoryRecordResponse,
+    MemoryRecordUpdateRequest,
+    MemoryRetrievalRequest,
     MultimodalFuseRequest,
     MultimodalFuseResponse,
     MultimodalProcessRequest,
@@ -45,10 +62,13 @@ from api.rest.schemas import (
     PlanningResponse,
     PromptSafetyRequest,
     PromptSafetyResponse,
+    ScoredMemoryResponse,
     SecurityAuditRequest,
     SecurityAuditResponse,
     SelfEvaluationRequest,
     SelfEvaluationResponse,
+    ShortTermMessageRequest,
+    ShortTermMessageResponse,
     SpeechRecognizeRequest,
     SpeechRecognizeResponse,
     SpeechSynthesizeRequest,
@@ -56,6 +76,10 @@ from api.rest.schemas import (
     TelemetryResponse,
     TokenizeRequest,
     TokenizeResponse,
+    UserPreferenceSetRequest,
+    WorkingTaskResponse,
+    WorkingTaskStartRequest,
+    WorkingTaskUpdateRequest,
 )
 from core.exceptions import SecurityViolationError
 from core.intelligence.central_router import CentralIntelligenceRouter
@@ -972,3 +996,846 @@ async def fuse_multimodal_modalities(
         fused_tensor_shape=list(res.fused_representation.shape),
         modality_weights=res.modality_weights,
     )
+
+
+# ==============================================================================
+# PHASE 09 — ADVANCED MEMORY & CONTROLLED LEARNING ENDPOINTS
+# ==============================================================================
+
+def _get_ltm(services: Dict[str, Any]):
+    from memory.long_term.long_term_memory import LongTermMemory
+    return services.get("long_term_memory") or LongTermMemory()
+
+def _get_stm(services: Dict[str, Any]):
+    from memory.short_term.short_term_memory import ShortTermMemory
+    return services.get("short_term_memory") or ShortTermMemory()
+
+def _get_wm(services: Dict[str, Any]):
+    from memory.working_memory import WorkingMemory
+    return services.get("working_memory") or WorkingMemory()
+
+def _get_em(services: Dict[str, Any]):
+    from memory.episodic.episodic_memory import EpisodicMemory
+    return services.get("episodic_memory") or EpisodicMemory()
+
+def _get_km(services: Dict[str, Any]):
+    from memory.knowledge.knowledge_memory import KnowledgeMemory
+    return services.get("knowledge_memory") or KnowledgeMemory()
+
+def _get_upm(services: Dict[str, Any]):
+    from memory.user_preferences import UserPreferenceMemory
+    return services.get("user_preference_memory") or UserPreferenceMemory()
+
+def _get_hre(services: Dict[str, Any]):
+    from memory.retrieval.retrieval_engine import HybridMemoryRetrievalEngine
+    return services.get("retrieval_engine") or HybridMemoryRetrievalEngine()
+
+def _get_mce(services: Dict[str, Any]):
+    from memory.consolidation.consolidation_engine import MemoryConsolidationEngine
+    return services.get("consolidation_engine") or MemoryConsolidationEngine()
+
+def _get_cme(services: Dict[str, Any]):
+    from memory.contextual_memory import ContextualMemoryEngine
+    return services.get("contextual_memory") or ContextualMemoryEngine()
+
+def _get_fs(services: Dict[str, Any]):
+    from learning.feedback.feedback_system import FeedbackSystem
+    return services.get("feedback_system") or FeedbackSystem()
+
+def _get_clp(services: Dict[str, Any]):
+    from learning.continual.learning_pipeline import ControlledLearningPipeline
+    return services.get("learning_pipeline") or ControlledLearningPipeline()
+
+
+# -----------------------------------------------------------------------------
+# Memory Records (Long-Term & Knowledge)
+# -----------------------------------------------------------------------------
+
+@router.post(
+    "/api/v1/memory/records",
+    response_model=MemoryRecordResponse,
+    tags=["Memory"],
+    summary="Save a persistent long-term memory record",
+)
+async def create_memory_record(
+    req: MemoryRecordCreateRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> MemoryRecordResponse:
+    ltm = _get_ltm(services)
+    try:
+        rec = ltm.save_record(
+            user_id=req.user_id,
+            content=req.content,
+            summary=req.summary,
+            importance=req.importance,
+            confidence=req.confidence,
+            is_confirmed_by_user=req.is_confirmed_by_user,
+            source_type=req.source_type,
+            tags=req.tags,
+        )
+        return MemoryRecordResponse(
+            record_id=rec.record_id,
+            user_id=rec.user_id,
+            content=rec.content,
+            summary=rec.summary,
+            importance=rec.importance,
+            confidence=rec.confidence,
+            is_confirmed_by_user=rec.is_confirmed_by_user,
+            version=rec.version,
+            parent_version_id=rec.parent_version_id,
+            source_type=rec.source_type,
+            tags=rec.tags,
+            created_at=rec.created_at,
+            updated_at=rec.updated_at,
+            status=rec.status,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.get(
+    "/api/v1/memory/records",
+    response_model=List[MemoryRecordResponse],
+    tags=["Memory"],
+    summary="List active persistent memory records for a user",
+)
+async def list_memory_records(
+    user_id: str,
+    limit: int = 50,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> List[MemoryRecordResponse]:
+    ltm = _get_ltm(services)
+    try:
+        records = ltm.list_records(user_id=user_id, limit=limit)
+        return [
+            MemoryRecordResponse(
+                record_id=r.record_id,
+                user_id=r.user_id,
+                content=r.content,
+                summary=r.summary,
+                importance=r.importance,
+                confidence=r.confidence,
+                is_confirmed_by_user=r.is_confirmed_by_user,
+                version=r.version,
+                parent_version_id=r.parent_version_id,
+                source_type=r.source_type,
+                tags=r.tags,
+                created_at=r.created_at,
+                updated_at=r.updated_at,
+                status=r.status,
+            )
+            for r in records
+        ]
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.put(
+    "/api/v1/memory/records/{record_id}",
+    response_model=MemoryRecordResponse,
+    tags=["Memory"],
+    summary="Update a persistent memory record with version increment",
+)
+async def update_memory_record(
+    record_id: str,
+    req: MemoryRecordUpdateRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> MemoryRecordResponse:
+    ltm = _get_ltm(services)
+    try:
+        rec = ltm.update_record(
+            user_id=req.user_id,
+            record_id=record_id,
+            new_content=req.new_content,
+            new_summary=req.new_summary,
+            importance=req.importance,
+            confidence=req.confidence,
+            is_confirmed_by_user=req.is_confirmed_by_user,
+            tags=req.tags,
+        )
+        return MemoryRecordResponse(
+            record_id=rec.record_id,
+            user_id=rec.user_id,
+            content=rec.content,
+            summary=rec.summary,
+            importance=rec.importance,
+            confidence=rec.confidence,
+            is_confirmed_by_user=rec.is_confirmed_by_user,
+            version=rec.version,
+            parent_version_id=rec.parent_version_id,
+            source_type=rec.source_type,
+            tags=rec.tags,
+            created_at=rec.created_at,
+            updated_at=rec.updated_at,
+            status=rec.status,
+        )
+    except KeyError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.delete(
+    "/api/v1/memory/records/{record_id}",
+    tags=["Memory"],
+    summary="Delete / archive a persistent memory record",
+)
+async def delete_memory_record(
+    record_id: str,
+    user_id: str,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> Dict[str, Any]:
+    ltm = _get_ltm(services)
+    try:
+        success = ltm.delete_record(user_id=user_id, record_id=record_id)
+        if not success:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Record not found")
+        return {"status": "success", "record_id": record_id, "deleted": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+# -----------------------------------------------------------------------------
+# Short-Term Memory
+# -----------------------------------------------------------------------------
+
+@router.post(
+    "/api/v1/memory/short-term",
+    response_model=ShortTermMessageResponse,
+    tags=["Memory"],
+    summary="Append a conversational turn to short-term memory",
+)
+async def add_short_term_message(
+    req: ShortTermMessageRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> ShortTermMessageResponse:
+    stm = _get_stm(services)
+    try:
+        msg = stm.add_message(
+            user_id=req.user_id,
+            session_id=req.session_id,
+            role=req.role,
+            content=req.content,
+        )
+        return ShortTermMessageResponse(
+            message_id=msg.message_id,
+            user_id=msg.user_id,
+            session_id=msg.session_id,
+            role=msg.role,
+            content=msg.content,
+            timestamp=msg.timestamp,
+            token_count_estimate=msg.token_count_estimate,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.get(
+    "/api/v1/memory/short-term",
+    response_model=List[ShortTermMessageResponse],
+    tags=["Memory"],
+    summary="Retrieve session history from short-term memory",
+)
+async def get_short_term_history(
+    user_id: str,
+    session_id: str,
+    limit: int = 20,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> List[ShortTermMessageResponse]:
+    stm = _get_stm(services)
+    try:
+        msgs = stm.get_history(user_id=user_id, session_id=session_id, limit=limit)
+        return [
+            ShortTermMessageResponse(
+                message_id=m.message_id,
+                user_id=m.user_id,
+                session_id=m.session_id,
+                role=m.role,
+                content=m.content,
+                timestamp=m.timestamp,
+                token_count_estimate=m.token_count_estimate,
+            )
+            for m in msgs
+        ]
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.delete(
+    "/api/v1/memory/short-term",
+    tags=["Memory"],
+    summary="Clear short-term memory for a session",
+)
+async def clear_short_term_session(
+    user_id: str,
+    session_id: str,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> Dict[str, Any]:
+    stm = _get_stm(services)
+    try:
+        count = stm.clear_session(user_id=user_id, session_id=session_id)
+        return {"status": "success", "session_id": session_id, "cleared_records": count}
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+# -----------------------------------------------------------------------------
+# Working Memory
+# -----------------------------------------------------------------------------
+
+@router.post(
+    "/api/v1/memory/working",
+    response_model=WorkingTaskResponse,
+    tags=["Memory"],
+    summary="Start or resume an active working memory task",
+)
+async def start_working_task(
+    req: WorkingTaskStartRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> WorkingTaskResponse:
+    wm = _get_wm(services)
+    try:
+        t = wm.start_task(
+            session_id=req.session_id,
+            task_id=req.task_id,
+            task_name=req.task_name,
+            objectives=req.objectives,
+            dependencies=req.dependencies,
+            initial_results=req.initial_results,
+        )
+        return WorkingTaskResponse(
+            session_id=t.session_id,
+            task_id=t.task_id,
+            task_name=t.task_name,
+            active_objectives=t.active_objectives,
+            intermediate_results=t.intermediate_results,
+            dependencies=t.dependencies,
+            pending_actions=t.pending_actions,
+            status=t.status,
+            created_at=t.created_at,
+            updated_at=t.updated_at,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.get(
+    "/api/v1/memory/working",
+    response_model=List[WorkingTaskResponse],
+    tags=["Memory"],
+    summary="List active working memory tasks for a session",
+)
+async def list_working_tasks(
+    session_id: str,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> List[WorkingTaskResponse]:
+    wm = _get_wm(services)
+    try:
+        tasks = wm.list_active_tasks(session_id=session_id)
+        return [
+            WorkingTaskResponse(
+                session_id=t.session_id,
+                task_id=t.task_id,
+                task_name=t.task_name,
+                active_objectives=t.active_objectives,
+                intermediate_results=t.intermediate_results,
+                dependencies=t.dependencies,
+                pending_actions=t.pending_actions,
+                status=t.status,
+                created_at=t.created_at,
+                updated_at=t.updated_at,
+            )
+            for t in tasks
+        ]
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+# -----------------------------------------------------------------------------
+# Episodic Memory
+# -----------------------------------------------------------------------------
+
+@router.post(
+    "/api/v1/memory/episodic",
+    response_model=EpisodicEventResponse,
+    tags=["Memory"],
+    summary="Record an episodic event to past interaction log",
+)
+async def record_episodic_event(
+    req: EpisodicEventRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> EpisodicEventResponse:
+    em = _get_em(services)
+    try:
+        event = em.record_event(
+            user_id=req.user_id,
+            event_description=req.event_description,
+            session_id=req.session_id,
+            task_id=req.task_id,
+            context_summary=req.context_summary,
+            outcome=req.outcome,
+            related_memory_ids=req.related_memory_ids,
+            user_feedback=req.user_feedback,
+        )
+        return EpisodicEventResponse(
+            event_id=event.event_id,
+            user_id=event.user_id,
+            session_id=event.session_id,
+            task_id=event.task_id,
+            event_description=event.event_description,
+            context_summary=event.context_summary,
+            outcome=event.outcome,
+            related_memory_ids=event.related_memory_ids,
+            user_feedback=event.user_feedback,
+            timestamp=event.timestamp,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.get(
+    "/api/v1/memory/episodic",
+    response_model=List[EpisodicEventResponse],
+    tags=["Memory"],
+    summary="Search episodic events (anti-fabrication guaranteed)",
+)
+async def search_episodic_events(
+    user_id: str,
+    query: Optional[str] = None,
+    limit: int = 10,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> List[EpisodicEventResponse]:
+    em = _get_em(services)
+    try:
+        if query:
+            events = em.search_events(user_id=user_id, query=query, limit=limit)
+        else:
+            events = em.get_recent_events(user_id=user_id, limit=limit)
+        return [
+            EpisodicEventResponse(
+                event_id=ev.event_id,
+                user_id=ev.user_id,
+                session_id=ev.session_id,
+                task_id=ev.task_id,
+                event_description=ev.event_description,
+                context_summary=ev.context_summary,
+                outcome=ev.outcome,
+                related_memory_ids=ev.related_memory_ids,
+                user_feedback=ev.user_feedback,
+                timestamp=ev.timestamp,
+            )
+            for ev in events
+        ]
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+# -----------------------------------------------------------------------------
+# User Preferences
+# -----------------------------------------------------------------------------
+
+@router.get(
+    "/api/v1/memory/preferences",
+    response_model=Dict[str, str],
+    tags=["Memory"],
+    summary="Get user preference settings and style directives",
+)
+async def get_user_preferences(
+    user_id: str,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> Dict[str, str]:
+    upm = _get_upm(services)
+    try:
+        return upm.get_all_preferences(user_id=user_id)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post(
+    "/api/v1/memory/preferences",
+    tags=["Memory"],
+    summary="Set or update a user preference",
+)
+async def set_user_preference(
+    req: UserPreferenceSetRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> Dict[str, Any]:
+    upm = _get_upm(services)
+    try:
+        pref = upm.set_preference(
+            user_id=req.user_id,
+            preference_key=req.preference_key,
+            preference_val=req.preference_val,
+            is_explicit=req.is_explicit,
+        )
+        return {
+            "status": "success",
+            "preference_key": pref.preference_key,
+            "preference_val": pref.preference_val,
+            "updated_at": pref.updated_at,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.delete(
+    "/api/v1/memory/preferences/{preference_key}",
+    tags=["Memory"],
+    summary="Delete a user preference setting",
+)
+async def delete_user_preference(
+    preference_key: str,
+    user_id: str,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> Dict[str, Any]:
+    upm = _get_upm(services)
+    try:
+        deleted = upm.delete_preference(user_id=user_id, preference_key=preference_key)
+        return {"status": "success", "preference_key": preference_key, "deleted": deleted}
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+# -----------------------------------------------------------------------------
+# Hybrid Retrieval, Consolidation & Context Assembly
+# -----------------------------------------------------------------------------
+
+@router.post(
+    "/api/v1/memory/retrieve",
+    response_model=List[ScoredMemoryResponse],
+    tags=["Memory"],
+    summary="Execute hybrid multi-dimensional memory retrieval with recency decay",
+)
+async def retrieve_memories(
+    req: MemoryRetrievalRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> List[ScoredMemoryResponse]:
+    retriever = _get_hre(services)
+    try:
+        results = retriever.retrieve(
+            user_id=req.user_id,
+            query=req.query,
+            memory_layer=req.memory_layer,
+            min_confidence=req.min_confidence,
+            limit=req.limit,
+        )
+        return [
+            ScoredMemoryResponse(
+                record_id=r.record_id,
+                user_id=r.user_id,
+                memory_layer=r.memory_layer,
+                content=r.content,
+                summary=r.summary,
+                final_score=r.final_score,
+                lexical_score=r.lexical_score,
+                recency_score=r.recency_score,
+                importance_score=r.importance_score,
+                confidence_score=r.confidence_score,
+                source_attribution=r.source_attribution,
+                created_at=r.created_at,
+                updated_at=r.updated_at,
+            )
+            for r in results
+        ]
+    except SecurityViolationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post(
+    "/api/v1/memory/consolidate",
+    response_model=ConsolidationResponse,
+    tags=["Memory"],
+    summary="Run memory consolidation and conflict detection (no silent overwriting)",
+)
+async def run_memory_consolidation(
+    req: ConsolidationRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> ConsolidationResponse:
+    mce = _get_mce(services)
+    try:
+        summary = mce.run_consolidation(user_id=req.user_id)
+        return ConsolidationResponse(
+            user_id=summary.user_id,
+            duplicates_resolved=summary.duplicates_resolved,
+            conflicts_detected=[
+                ConflictReportItem(
+                    conflict_id=c.conflict_id,
+                    existing_record_id=c.existing_record_id,
+                    conflicting_record_id=c.conflicting_record_id,
+                    subject_area=c.subject_area,
+                    existing_content=c.existing_content,
+                    conflicting_content=c.conflicting_content,
+                    resolution_status=c.resolution_status,
+                    detected_at=c.detected_at,
+                )
+                for c in summary.conflicts_detected
+            ],
+            records_merged=summary.records_merged,
+            consolidated_at=summary.consolidated_at,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post(
+    "/api/v1/memory/context",
+    response_model=ContextAssemblyResponse,
+    tags=["Memory"],
+    summary="Synthesize multi-layer prompt context respecting token budgets",
+)
+async def assemble_context(
+    req: ContextAssemblyRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> ContextAssemblyResponse:
+    cme = _get_cme(services)
+    try:
+        ctx = cme.assemble_context(
+            user_id=req.user_id,
+            session_id=req.session_id,
+            current_query=req.current_query,
+            token_budget=req.token_budget,
+        )
+        return ContextAssemblyResponse(
+            full_context_text=ctx.full_context_text,
+            personalization_directive=ctx.personalization_directive,
+            active_tasks_count=len(ctx.active_tasks),
+            retrieved_memories_count=len(ctx.retrieved_memories),
+            conversation_turns_count=len(ctx.conversation_turns),
+            estimated_tokens=ctx.estimated_tokens,
+            budget_limit=ctx.budget_limit,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+# -----------------------------------------------------------------------------
+# Continual Learning & User Feedback
+# -----------------------------------------------------------------------------
+
+@router.post(
+    "/api/v1/learning/feedback",
+    response_model=FeedbackResponse,
+    tags=["Continual Learning"],
+    summary="Submit user feedback for offline continual learning curation",
+)
+async def submit_feedback(
+    req: FeedbackSubmitRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> FeedbackResponse:
+    from learning.feedback.feedback_system import FeedbackType
+    fs = _get_fs(services)
+    try:
+        fb_type = FeedbackType(req.feedback_type.upper())
+    except ValueError:
+        fb_type = FeedbackType.POSITIVE
+
+    try:
+        rec = fs.record_feedback(
+            user_id=req.user_id,
+            feedback_type=fb_type,
+            response_id=req.response_id,
+            task_id=req.task_id,
+            rating=req.rating,
+            suggested_correction=req.suggested_correction,
+            category=req.category,
+            comment=req.comment,
+        )
+        return FeedbackResponse(
+            feedback_id=rec.feedback_id,
+            user_id=rec.user_id,
+            response_id=rec.response_id,
+            task_id=rec.task_id,
+            feedback_type=rec.feedback_type.value,
+            rating=rec.rating,
+            suggested_correction=rec.suggested_correction,
+            category=rec.category,
+            comment=rec.comment,
+            status=rec.status.value,
+            created_at=rec.created_at,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.get(
+    "/api/v1/learning/feedback",
+    response_model=List[FeedbackResponse],
+    tags=["Continual Learning"],
+    summary="List submitted user feedback records",
+)
+async def list_feedback_records(
+    user_id: Optional[str] = None,
+    limit: int = 50,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> List[FeedbackResponse]:
+    fs = _get_fs(services)
+    try:
+        records = fs.list_feedback(user_id=user_id, limit=limit)
+        return [
+            FeedbackResponse(
+                feedback_id=r.feedback_id,
+                user_id=r.user_id,
+                response_id=r.response_id,
+                task_id=r.task_id,
+                feedback_type=r.feedback_type.value,
+                rating=r.rating,
+                suggested_correction=r.suggested_correction,
+                category=r.category,
+                comment=r.comment,
+                status=r.status.value,
+                created_at=r.created_at,
+            )
+            for r in records
+        ]
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post(
+    "/api/v1/learning/feedback/{feedback_id}/validate",
+    tags=["Continual Learning"],
+    summary="Validate or reject feedback for downstream dataset preparation",
+)
+async def validate_feedback_record(
+    feedback_id: str,
+    req: FeedbackValidateRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> Dict[str, Any]:
+    fs = _get_fs(services)
+    try:
+        success = fs.validate_feedback(feedback_id=feedback_id, is_valid=req.is_valid, validation_notes=req.notes)
+        return {"status": "success", "feedback_id": feedback_id, "validated": success}
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post(
+    "/api/v1/learning/jobs",
+    response_model=LearningJobResponse,
+    tags=["Continual Learning"],
+    summary="Create a 10-stage offline continual learning job",
+)
+async def create_learning_job(
+    req: LearningJobCreateRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> LearningJobResponse:
+    pipe = _get_clp(services)
+    try:
+        job = pipe.create_job(target_version=req.target_version)
+        return LearningJobResponse(
+            job_id=job.job_id,
+            current_stage=job.current_stage.value,
+            status=job.status.value,
+            target_version=job.target_version,
+            dataset_manifest_hash=job.dataset_manifest_hash,
+            stage_history_count=len(job.stage_history),
+            is_approved=job.is_approved,
+            created_at=job.created_at,
+            updated_at=job.updated_at,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.get(
+    "/api/v1/learning/jobs/{job_id}",
+    response_model=LearningJobResponse,
+    tags=["Continual Learning"],
+    summary="Get 10-stage continual learning pipeline job status",
+)
+async def get_learning_job_status(
+    job_id: str,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> LearningJobResponse:
+    pipe = _get_clp(services)
+    job = pipe.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Job '{job_id}' not found.")
+    return LearningJobResponse(
+        job_id=job.job_id,
+        current_stage=job.current_stage.value,
+        status=job.status.value,
+        target_version=job.target_version,
+        dataset_manifest_hash=job.dataset_manifest_hash,
+        stage_history_count=len(job.stage_history),
+        is_approved=job.is_approved,
+        created_at=job.created_at,
+        updated_at=job.updated_at,
+    )
+
+
+@router.post(
+    "/api/v1/learning/jobs/{job_id}/run-pipeline",
+    response_model=LearningJobResponse,
+    tags=["Continual Learning"],
+    summary="Execute end-to-end 10-stage controlled learning workflow",
+)
+async def run_end_to_end_pipeline(
+    job_id: str,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> LearningJobResponse:
+    pipe = _get_clp(services)
+    try:
+        job = pipe.get_job(job_id)
+        if not job:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+
+        pipe.run_stage_01_collection(job_id)
+        pipe.run_stage_02_validation(job_id)
+        pipe.run_stage_03_curation(job_id)
+        pipe.run_stage_04_dataset_prep(job_id)
+        pipe.run_stage_05_job_config(job_id)
+        pipe.run_stage_06_model_eval(job_id)
+        pipe.run_stage_07_regression_testing(job_id)
+        pipe.run_stage_08_model_versioning(job_id)
+
+        return LearningJobResponse(
+            job_id=job.job_id,
+            current_stage=job.current_stage.value,
+            status=job.status.value,
+            target_version=job.target_version,
+            dataset_manifest_hash=job.dataset_manifest_hash,
+            stage_history_count=len(job.stage_history),
+            is_approved=job.is_approved,
+            created_at=job.created_at,
+            updated_at=job.updated_at,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post(
+    "/api/v1/learning/jobs/{job_id}/approve",
+    response_model=LearningJobResponse,
+    tags=["Continual Learning"],
+    summary="Submit governance approval decision for a continual learning model artifact",
+)
+async def approve_learning_job(
+    job_id: str,
+    req: LearningJobApproveRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> LearningJobResponse:
+    pipe = _get_clp(services)
+    try:
+        pipe.run_stage_09_model_approval(job_id, approver=req.approver, approved=req.approved, reason=req.reason)
+        if req.approved:
+            pipe.run_stage_10_deployment(job_id)
+
+        job = pipe.get_job(job_id)
+        return LearningJobResponse(
+            job_id=job.job_id,
+            current_stage=job.current_stage.value,
+            status=job.status.value,
+            target_version=job.target_version,
+            dataset_manifest_hash=job.dataset_manifest_hash,
+            stage_history_count=len(job.stage_history),
+            is_approved=job.is_approved,
+            created_at=job.created_at,
+            updated_at=job.updated_at,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

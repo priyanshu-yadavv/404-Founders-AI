@@ -17,6 +17,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.rest.routes import router
 from core.intelligence.central_router import CentralIntelligenceRouter
 from core.intelligence.neural_core import NeuralCore, NeuralCoreConfig
+from database.connection import DatabaseManager
+from learning.continual.learning_pipeline import ControlledLearningPipeline
+from learning.feedback.feedback_system import FeedbackSystem
+from memory.consolidation.consolidation_engine import MemoryConsolidationEngine
+from memory.contextual_memory import ContextualMemoryEngine
+from memory.episodic.episodic_memory import EpisodicMemory
+from memory.knowledge.knowledge_memory import KnowledgeMemory
+from memory.long_term.long_term_memory import LongTermMemory
+from memory.personalization.personalization_engine import PersonalizationEngine
+from memory.retrieval.retrieval_engine import HybridMemoryRetrievalEngine
+from memory.short_term.short_term_memory import ShortTermMemory
+from memory.user_preferences import UserPreferenceMemory
+from memory.working_memory import WorkingMemory
 from multimodal.modality_router import ModalityRouter
 from neural_architecture.inference import InferenceEngine
 from tokenizer import CustomBPETokenizer
@@ -48,12 +61,46 @@ def initialize_runtime_services() -> Dict[str, Any]:
     central_router = CentralIntelligenceRouter(d_model=core_cfg.d_model)
     modality_router = ModalityRouter(central_router=central_router)
 
+    # Multi-Layer Memory & Continual Learning Services
+    db_mgr = DatabaseManager.get_instance()
+    short_term_mem = ShortTermMemory(db_mgr)
+    long_term_mem = LongTermMemory(db_mgr)
+    working_mem = WorkingMemory(db_mgr)
+    episodic_mem = EpisodicMemory(db_mgr)
+    knowledge_mem = KnowledgeMemory(db_mgr)
+    pref_mem = UserPreferenceMemory(db_mgr)
+    retrieval_eng = HybridMemoryRetrievalEngine(db_mgr)
+    consolidation_eng = MemoryConsolidationEngine(db_mgr)
+    personalization_eng = PersonalizationEngine(pref_memory=pref_mem, db_manager=db_mgr)
+    contextual_mem = ContextualMemoryEngine(
+        db_manager=db_mgr,
+        short_term=short_term_mem,
+        working_mem=working_mem,
+        retrieval_engine=retrieval_eng,
+        personalization=personalization_eng,
+    )
+    feedback_sys = FeedbackSystem(db_mgr)
+    learning_pipe = ControlledLearningPipeline(db_manager=db_mgr, feedback_sys=feedback_sys)
+
     return {
         "tokenizer": tokenizer,
         "neural_model": neural_model,
         "inference_engine": inference_engine,
         "central_router": central_router,
         "modality_router": modality_router,
+        "db_manager": db_mgr,
+        "short_term_memory": short_term_mem,
+        "long_term_memory": long_term_mem,
+        "working_memory": working_mem,
+        "episodic_memory": episodic_mem,
+        "knowledge_memory": knowledge_mem,
+        "user_preference_memory": pref_mem,
+        "retrieval_engine": retrieval_eng,
+        "consolidation_engine": consolidation_eng,
+        "personalization_engine": personalization_eng,
+        "contextual_memory": contextual_mem,
+        "feedback_system": feedback_sys,
+        "learning_pipeline": learning_pipe,
         "start_time": time.time(),
     }
 

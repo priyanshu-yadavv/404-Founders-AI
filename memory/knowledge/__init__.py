@@ -1,4 +1,17 @@
 """
-404 FOUNDERS — Memory/Knowledge
-Structured knowledge graphs, factual databases, and entity indices.
+404 FOUNDERS — Semantic & Knowledge Memory Subsystem
 """
+
+from memory.knowledge.knowledge_memory import (
+    ClaimType,
+    KnowledgeFact,
+    KnowledgeMemory,
+    KnowledgeRelationship,
+)
+
+__all__ = [
+    "ClaimType",
+    "KnowledgeFact",
+    "KnowledgeMemory",
+    "KnowledgeRelationship",
+]

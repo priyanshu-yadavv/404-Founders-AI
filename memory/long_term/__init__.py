@@ -1,4 +1,7 @@
 """
-404 FOUNDERS — Memory/Long Term
-Persistent semantic vector memory, external vector store abstractions.
+404 FOUNDERS — Long-Term Memory Subsystem
 """
+
+from memory.long_term.long_term_memory import LongTermMemory, LongTermRecord
+
+__all__ = ["LongTermMemory", "LongTermRecord"]

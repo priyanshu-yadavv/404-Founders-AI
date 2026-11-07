@@ -147,3 +147,6 @@ logs/
 *.log
 tmp/
 temp/
+*.db
+*.sqlite
+*.sqlite3

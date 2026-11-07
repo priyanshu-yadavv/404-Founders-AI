@@ -1,4 +1,10 @@
 """
-404 FOUNDERS — Memory/Retrieval
-Hybrid sparse-dense retrieval, BM25, and semantic vector similarity search.
+404 FOUNDERS — Memory Retrieval Subsystem
 """
+
+from memory.retrieval.retrieval_engine import (
+    HybridMemoryRetrievalEngine,
+    ScoredMemoryRecord,
+)
+
+__all__ = ["HybridMemoryRetrievalEngine", "ScoredMemoryRecord"]
