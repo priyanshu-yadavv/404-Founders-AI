@@ -171,6 +171,7 @@ from core.conversation_manager import (
 from core.exceptions import SecurityViolationError
 from core.intelligence.central_router import CentralIntelligenceRouter
 from core.intelligence.neural_core import NeuralCore, NeuralCoreConfig
+from jarvis.models import JarvisState
 from multimodal.audio.speech_generation import VoiceConfig
 from multimodal.modality_router import ModalityRouter
 from neural_architecture.fusion.multimodal_fusion import MultimodalInput
