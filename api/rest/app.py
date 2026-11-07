@@ -11,10 +11,15 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.rest.routes import router
+from core.conversation_manager import (
+    ActivityLogManager,
+    ConversationManager,
+    UserSettingsManager,
+)
 from core.intelligence.central_router import CentralIntelligenceRouter
 from core.intelligence.neural_core import NeuralCore, NeuralCoreConfig
 from database.connection import DatabaseManager
@@ -34,7 +39,9 @@ from multimodal.modality_router import ModalityRouter
 from neural_architecture.inference import InferenceEngine
 from personal_ai.controller import PersonalAIController
 from personal_ai.memory_bridge import PersonalAIMemoryBridge
+from security.auth import AuthManager
 from tokenizer import CustomBPETokenizer
+from api.websocket.handler import handle_websocket_session
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -95,6 +102,12 @@ def initialize_runtime_services() -> Dict[str, Any]:
         )
     )
 
+    # Phase 11 — Authentication, Conversation, Settings, Activity Managers
+    auth_mgr = AuthManager(db_mgr)
+    conversation_mgr = ConversationManager(db_mgr)
+    settings_mgr = UserSettingsManager(db_mgr)
+    activity_mgr = ActivityLogManager(db_mgr)
+
     return {
         "tokenizer": tokenizer,
         "neural_model": neural_model,
@@ -114,6 +127,10 @@ def initialize_runtime_services() -> Dict[str, Any]:
         "contextual_memory": contextual_mem,
         "feedback_system": feedback_sys,
         "learning_pipeline": learning_pipe,
+        "auth_manager": auth_mgr,
+        "conversation_manager": conversation_mgr,
+        "settings_manager": settings_mgr,
+        "activity_manager": activity_mgr,
         "personal_ai_controller": personal_ai_ctrl,
         "agent_runtime": personal_ai_ctrl.runtime,
         "approval_manager": personal_ai_ctrl.approval_mgr,
@@ -165,12 +182,20 @@ def create_app(
         CORSMiddleware,
         allow_origins=origins,
         allow_credentials=True,
-        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
         allow_headers=["*"],
     )
 
     if services is not None:
         app.state.services = services
+
+    # Mount WebSocket streaming endpoints
+    @app.websocket("/ws/v1/stream")
+    @app.websocket("/ws/v1/chat")
+    async def websocket_stream_endpoint(websocket: WebSocket) -> None:
+        if not hasattr(app.state, "services") or not app.state.services:
+            app.state.services = initialize_runtime_services()
+        await handle_websocket_session(websocket, app.state.services)
 
     # Mount API routers
     app.include_router(router)

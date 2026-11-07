@@ -498,11 +498,21 @@ flowchart TD
 | **Phase 07** | Modular Intelligence Modules | **Completed** |
 | **Phase 08** | Multimodal Intelligence & Cross-Modal Fusion | **Completed** |
 | **Phase 09** | Advanced Memory & Controlled Learning Architecture | **Completed** |
-| **Phase 10** | **Personal AI Integration** | **Completed (Review Pending)** |
+| **Phase 10** | Personal AI Integration | **Completed** |
+| **Phase 11** | **API, Frontend & Deployment** | **Completed (Review Pending)** |
 
 ---
 
-## 13. Quickstart, Localhost Testing & Verification
+## 13. Quickstart, Localhost Testing & Deployment
+
+### Automated Pre-Flight Verification Check
+Before running or deploying the system, execute the pre-flight verification script:
+```bash
+python3 scripts/deploy_check.py
+```
+This tests Python runtime version, PyTorch CPU execution, SQLite database schema migrations, Neural Core tensor forward pass, frontend files, and deployment configurations.
+
+---
 
 ### Localhost Application Execution
 
@@ -511,33 +521,47 @@ The project runs locally on the developer workstation without GPUs or pretrained
 #### Step 1: Launch Backend API Server (FastAPI + Uvicorn)
 ```bash
 # Start FastAPI backend on http://127.0.0.1:8000
-.venv/bin/python scripts/run_backend.py
-
-# Or via uvicorn directly:
-.venv/bin/uvicorn api.rest.app:app --host 127.0.0.1 --port 8000
+python3 -m uvicorn api.rest.app:app --host 127.0.0.1 --port 8000
 ```
 - **Health Check:** [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health)
 - **Interactive OpenAPI Documentation:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 - **ReDoc API Documentation:** [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
+- **WebSocket Streaming Gateway:** `ws://127.0.0.1:8000/ws/v1/stream` & `ws://127.0.0.1:8000/ws/v1/chat`
 
 #### Step 2: Launch Frontend Testing Dashboard
 ```bash
-# In a separate terminal, start frontend on http://localhost:5173
-cd frontend && npm start
-
-# Or directly:
+# Start frontend on http://localhost:5173
 node frontend/server.js
 ```
 - **Local Dashboard:** [http://localhost:5173](http://localhost:5173)
-- **Features:** Warm neutral design, Light/Dark/System theme selector, Multimodal Studio view, Memory & Controlled Continual Learning center, and Personal AI resident agent dashboard (hardware telemetry, process shields, file explorer, command advisor, approval ticket queue, and audit trail).
+- **Features:** Warm neutral design, 9 unified workspaces, Live token streaming over WebSocket/SSE, Web Speech API speech-to-text, message copy/edit/regenerate, settings & session management, and task & activity history ledger.
 
 ---
 
-### Automated Tests & CLI Diagnostics
+### Containerized Deployment (Docker & Nginx)
+
+#### Local Development Orchestration
+```bash
+docker compose up -d --build
+```
+
+#### Production Deployment with Resource Guards & Nginx Reverse Proxy
+```bash
+./scripts/run_production.sh
+
+# Or directly:
+docker compose -f docker-compose.prod.yml up -d --build
+```
+Access the unified production environment at [http://localhost](http://localhost).
+
+---
+
+### Automated Tests & Verification
 
 ```bash
-# 1. Run complete automated test suite (305 tests) on CPU
-.venv/bin/python -m pytest tests/
+# Run complete automated test suite (323 tests) on CPU
+python3 -m pytest tests/
+```
 
 # 2. Query Personal AI Agent via REST API
 curl -s http://127.0.0.1:8000/api/v1/personal-ai/system/summary | jq .

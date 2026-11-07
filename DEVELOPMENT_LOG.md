@@ -840,3 +840,84 @@ Authored 4 comprehensive technical manuals in `docs/`:
   - `tests/api/test_personal_ai_endpoints.py` (12 tests)
 - Executed entire test suite: **305 passed in 13.02s (100% success rate on CPU)**.
 - Staged all Phase 10 files awaiting user review and approval to commit.
+
+---
+
+## [2026-11-07T11:05:00+05:30] — Phase 11: Unified API, Frontend & Deployment Architecture
+
+### 1. Database Schema Migration 2 (`database/schema.py`)
+- Authored Migration 2 in `database/schema.py`:
+  - `user_accounts`: Normalized identity table with PBKDF2 password hashes, salts, and roles.
+  - `user_sessions`: Cryptographic session tokens stored as SHA-256 hashes for defense-in-depth.
+  - `conversation_threads`: Multi-turn thread metadata with cascade delete constraints.
+  - `conversation_messages`: Chronologically ordered messages with structured JSON metadata.
+  - `user_application_settings`: Per-user UI appearance, language, voice, and retention windows.
+  - `activity_log_entries`: Unified immutable operational audit ledger.
+  - Performance indexes for high-throughput query dispatch.
+
+### 2. Cryptographic Authentication & Session Subsystem (`security/auth.py`)
+- Implemented `AuthManager` in `security/auth.py`:
+  - PBKDF2-HMAC-SHA256 password hashing (100,000 iterations, 16-byte random salt).
+  - Constant-time verification using `secrets.compare_digest`.
+  - Default operator bootstrapping on first initialization.
+  - Session token generation (`404SESS-...`), validation, and revocation.
+
+### 3. Conversation, Settings & Activity Manager (`core/conversation_manager.py`)
+- Implemented `ConversationManager`: Thread CRUD, message appending/listing, and foreign-key user resolution.
+- Implemented `UserSettingsManager`: Appearance, language, voice, and retention settings persistence.
+- Implemented `ActivityLogManager`: Audit recording across intelligence, agent, learning, and auth domains.
+
+### 4. REST APIs, WebSocket Gateway & gRPC Services
+- **REST Endpoints (`api/rest/routes.py`):**
+  - Auth: Register, Login, Logout, Me, Sessions list, Session delete.
+  - Conversations: Threads CRUD, Message listing, Message send with intelligence routing.
+  - Streaming: Server-Sent Events (`POST /api/v1/chat/stream`).
+  - Settings: Get and update user application settings.
+  - Activity: List operational audit history with category filtering.
+- **WebSocket Streaming Gateway (`api/websocket/handler.py`):**
+  - Bidirectional communication on `/ws/v1/stream` and `/ws/v1/chat`.
+  - Emits progressive status events (`stage`), token pieces (`token`), and completion receipts (`done`).
+- **gRPC Cluster Servicers (`api/grpc/`):**
+  - IDL definition in `api/grpc/founders_service.proto`.
+  - Pure Python servicers in `api/grpc/service.py`: `NeuralInferenceServicer`, `ClusterTelemetryServicer`, `TaskDispatchServicer`.
+
+### 5. Frontend Polish & 9 Unified Workspaces (`frontend/public/`)
+- Unified left navigation with all 9 primary workspaces:
+  1. General Intelligence (`intelligence`)
+  2. Personal AI Agent (`personal-ai`)
+  3. Coding Assistant (`coding`)
+  4. Cybersecurity Intelligence (`cybersecurity`)
+  5. Multimodal Studio (`multimodal`)
+  6. Memory & Continual Learning (`memory`)
+  7. System Intelligence (`telemetry`)
+  8. Task & Activity History (`activity`)
+  9. Settings & Sessions (`settings`)
+- In Chat: Thread selector (`+ New Chat`, delete thread), Live token streaming toggle, Markdown code blocks with copy buttons, message edit, regenerate response, and Web Speech API speech-to-text / text-to-speech.
+- In Settings: Theme mode selector, Voice Assistant configuration, Memory retention days, Backend URL testing, and Active sessions table with Revoke buttons.
+- In Activity: Unified audit table with category filtering and status indicators.
+
+### 6. Hardened Deployment Infrastructure
+- `Dockerfile.backend`: Python 3.11-slim, PyTorch CPU, non-root user `founders`, ports 8000/50051, healthcheck.
+- `Dockerfile.frontend`: Node.js 20 Alpine, non-root user `node`, port 5173, healthcheck.
+- `docker-compose.yml`: Development orchestration.
+- `docker-compose.prod.yml`: Production orchestration with resource limits and Nginx proxy.
+- `nginx/nginx.conf`: Reverse proxy routing `/api/`, `/ws/`, `/` with WebSocket upgrade and security headers.
+- `.env.production.example`: Production environment template.
+- `scripts/deploy_check.py`: Automated pre-flight validation (all checks PASS).
+- `scripts/run_production.sh`: Production startup script.
+
+### 7. Documentation Authored
+- [`docs/FRONTEND_ARCHITECTURE.md`](docs/FRONTEND_ARCHITECTURE.md) (`DOC-FRONT-001`)
+- [`docs/BACKEND_API_ARCHITECTURE.md`](docs/BACKEND_API_ARCHITECTURE.md) (`DOC-API-002`)
+- [`docs/DEPLOYMENT_GUIDE.md`](docs/DEPLOYMENT_GUIDE.md) (`DOC-DEP-001`)
+- [`docs/SECURITY_GUIDE.md`](docs/SECURITY_GUIDE.md) (`DOC-SEC-002`)
+
+### 8. Automated Testing & Verification
+- Authored 18 new tests across 4 test suites:
+  - `tests/api/test_auth_endpoints.py` (2 tests)
+  - `tests/api/test_conversation_endpoints.py` (4 tests)
+  - `tests/api/test_websocket_streaming.py` (2 tests)
+  - `tests/api/test_grpc_services.py` (3 tests)
+  - `tests/deployment/test_deployment_configs.py` (7 tests)
+- Full test suite: **323 passed in 14.36s (100% pass rate, 0 failures)**.
+

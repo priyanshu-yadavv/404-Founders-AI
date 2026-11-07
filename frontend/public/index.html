@@ -62,6 +62,16 @@
             </li>
           </ul>
 
+            <li class="nav-item" data-view="activity">
+              <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+              <span>Task & Activity History</span>
+            </li>
+            <li class="nav-item" data-view="settings">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+              <span>Settings</span>
+            </li>
+          </ul>
+
           <div class="nav-group-label" style="margin-top: 10px;">System & Specs</div>
           <ul class="nav-list">
             <li class="nav-item" data-view="api">
@@ -120,6 +130,20 @@
         <!-- View 1: Intelligence & Chat -->
         <section id="view-intelligence" class="view-panel active">
           <div class="chat-container">
+            <!-- Threads Toolbar -->
+            <div class="chat-threads-bar" style="display: flex; gap: 8px; align-items: center; padding: 8px 16px; background: var(--surface-secondary); border-bottom: 1px solid var(--border);">
+              <button id="btnNewChat" class="btn-secondary btn-sm" style="font-size: 11.5px; padding: 4px 10px;">+ New Chat</button>
+              <div style="display: flex; align-items: center; gap: 6px; flex: 1;">
+                <label for="threadSelector" style="font-size: 12px; color: var(--text-secondary);">Thread:</label>
+                <select id="threadSelector" class="form-select" style="max-width: 260px; padding: 4px 8px; font-size: 12px; border-radius: 4px; border: 1px solid var(--border);"></select>
+              </div>
+              <button id="btnDeleteThread" class="btn-secondary btn-sm" title="Delete active thread" style="color: #b91c1c; font-size: 12px; padding: 4px 8px;">🗑️</button>
+              <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer;" title="Toggle progressive live token streaming over WebSocket/SSE">
+                <input type="checkbox" id="chkLiveStreaming" checked />
+                <span>Live Streaming</span>
+              </label>
+            </div>
+
             <div class="chat-history" id="chatThread">
               <div class="editorial-note">
                 <h3>Foundation Model Initialization Notice</h3>
@@ -167,6 +191,7 @@
                   <button type="button" class="media-upload-btn" id="btnAttachAudio" title="Attach Audio">🎙️ Audio</button>
                   <button type="button" class="media-upload-btn" id="btnAttachVideo" title="Attach Video">🎬 Video</button>
                   <button type="button" class="media-upload-btn" id="btnAttachDoc" title="Attach Document">📄 Doc</button>
+                  <button type="button" class="media-upload-btn" id="btnRecordMic" title="Voice Input (Speech-to-Text)">🎤 Voice</button>
 
                   <label style="margin-left: 6px;">
                     <input type="checkbox" id="chkMultimodalFusion" checked />
@@ -1229,6 +1254,170 @@ Awaiting trigger for next offline continual learning cycle.
               </div>
               <div class="output-container" id="fusionResultsBox" style="margin-top: 14px; min-height: 90px;">
                 Configure modalities and click "Execute Multimodal Fusion" to test tensor generation.
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- View 8: Task and Activity History -->
+        <section id="view-activity" class="view-panel">
+          <div class="activity-container">
+            <div class="panel-header-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <div>
+                <h3 style="margin: 0 0 4px 0; font-size: 16px; font-weight: 600;">Unified Task & Activity Ledger</h3>
+                <p class="section-desc" style="margin: 0;">Audit history across intelligence routing, Personal AI actions, learning jobs, and authentication.</p>
+              </div>
+              <div class="activity-controls" style="display: flex; gap: 8px; align-items: center;">
+                <select id="activityCategoryFilter" class="form-select" style="padding: 6px 10px; font-size: 12px; border-radius: 4px; border: 1px solid var(--border);">
+                  <option value="">All Categories</option>
+                  <option value="INTELLIGENCE">Intelligence</option>
+                  <option value="PERSONAL_AI">Personal AI</option>
+                  <option value="CODING">Coding</option>
+                  <option value="SECURITY">Security</option>
+                  <option value="LEARNING">Continual Learning</option>
+                  <option value="AUTH">Authentication</option>
+                  <option value="SETTINGS">Settings</option>
+                </select>
+                <button id="btnRefreshActivity" class="btn-secondary btn-sm">Refresh</button>
+              </div>
+            </div>
+
+            <div class="dashboard-card" style="padding: 0; overflow: hidden;">
+              <div class="table-container" style="max-height: 520px; overflow-y: auto;">
+                <table class="data-table" id="activityTable" style="width: 100%; border-collapse: collapse; font-size: 12.5px;">
+                  <thead>
+                    <tr style="background: var(--surface-secondary); text-align: left; border-bottom: 1px solid var(--border);">
+                      <th style="padding: 10px 14px;">Timestamp</th>
+                      <th style="padding: 10px 14px;">User</th>
+                      <th style="padding: 10px 14px;">Category</th>
+                      <th style="padding: 10px 14px;">Action</th>
+                      <th style="padding: 10px 14px;">Status</th>
+                      <th style="padding: 10px 14px;">Details</th>
+                    </tr>
+                  </thead>
+                  <tbody id="activityTableBody">
+                    <tr><td colspan="6" style="padding: 24px; text-align: center; color: var(--text-secondary);">Loading activity events...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- View 9: Settings -->
+        <section id="view-settings" class="view-panel">
+          <div class="settings-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px;">
+            <!-- Appearance Settings Card -->
+            <div class="dashboard-card">
+              <div class="card-header">
+                <h4>Appearance & Theme</h4>
+              </div>
+              <div class="card-body">
+                <p class="section-desc">Select the workspace visual mode adhering to the Warm Neutral design system.</p>
+                <div class="settings-field" style="margin-top: 12px;">
+                  <label class="form-label">Theme Mode</label>
+                  <select id="settingsTheme" class="form-select" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border);">
+                    <option value="light">Warm Light (#F4F0E8 / #FFFFFF)</option>
+                    <option value="dark">Warm Dark (#1E1C18 / #262420)</option>
+                    <option value="system">System Default</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Voice & Audio Configuration Card -->
+            <div class="dashboard-card">
+              <div class="card-header">
+                <h4>Voice Assistant Configuration</h4>
+              </div>
+              <div class="card-body">
+                <p class="section-desc">Configure Web Audio API synthesis and speech recognition parameters.</p>
+                <div style="margin: 12px 0; display: flex; flex-direction: column; gap: 8px;">
+                  <label style="display: flex; align-items: center; gap: 8px; font-size: 13px;">
+                    <input type="checkbox" id="settingsVoiceEnabled" /> Enable Voice Assistant Input
+                  </label>
+                  <label style="display: flex; align-items: center; gap: 8px; font-size: 13px;">
+                    <input type="checkbox" id="settingsTTSAutoplay" /> Autoplay Audio Responses (TTS)
+                  </label>
+                </div>
+                <div class="settings-field">
+                  <label class="form-label">Primary Speech Language</label>
+                  <select id="settingsLanguage" class="form-select" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border);">
+                    <option value="en">English (US/UK)</option>
+                    <option value="hi">Hindi (हिंदी)</option>
+                    <option value="de">German (Deutsch)</option>
+                    <option value="fr">French (Français)</option>
+                    <option value="es">Spanish (Español)</option>
+                    <option value="zh">Chinese (中文)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Memory Retention Card -->
+            <div class="dashboard-card">
+              <div class="card-header">
+                <h4>Memory Retention & Sovereignty</h4>
+              </div>
+              <div class="card-body">
+                <p class="section-desc">Controls data retention windows and local privacy isolation policies.</p>
+                <div class="settings-field" style="margin-top: 12px;">
+                  <label class="form-label">Episodic & Context Retention (Days)</label>
+                  <input type="number" id="settingsRetentionDays" min="1" max="3650" value="365" class="form-input" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border);" />
+                </div>
+                <button id="btnClearShortMemory" class="btn-secondary btn-sm" style="margin-top: 12px;">Purge Short-Term Session Memory</button>
+              </div>
+            </div>
+
+            <!-- Backend Endpoint Configuration Card -->
+            <div class="dashboard-card">
+              <div class="card-header">
+                <h4>Backend API Endpoint</h4>
+              </div>
+              <div class="card-body">
+                <p class="section-desc">Configures target FastAPI backend host URL for local or containerized deployment.</p>
+                <div class="settings-field" style="margin-top: 12px;">
+                  <label class="form-label">REST / WebSocket Gateway URL</label>
+                  <div style="display: flex; gap: 8px;">
+                    <input type="text" id="settingsEndpointUrl" class="form-input" value="http://127.0.0.1:8000" style="flex: 1; padding: 8px; border-radius: 4px; border: 1px solid var(--border);" />
+                    <button id="btnSaveEndpoint" class="btn-primary btn-sm">Save & Test</button>
+                  </div>
+                </div>
+                <div id="endpointTestResult" style="margin-top: 8px; font-size: 12px; min-height: 18px;"></div>
+              </div>
+            </div>
+
+            <!-- User Account & Session Management Card (Full Width) -->
+            <div class="dashboard-card" style="grid-column: 1 / -1;">
+              <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <h4>Authenticated User & Active Sessions</h4>
+                <button id="btnSettingsLogout" class="btn-secondary btn-sm">Log Out</button>
+              </div>
+              <div class="card-body">
+                <div class="user-profile-summary" id="userProfileSummary" style="display: flex; gap: 16px; align-items: center; padding: 12px; background: var(--surface-secondary); border-radius: 6px; margin-bottom: 16px;">
+                  <div style="font-size: 24px;">👤</div>
+                  <div>
+                    <div style="font-weight: 600; font-size: 14px;"><span id="profileUsername">operator</span> (<span id="profileRole">ADMIN</span>)</div>
+                    <div style="color: var(--text-secondary); font-size: 12px;" id="profileEmail">operator@404founders.local</div>
+                  </div>
+                </div>
+                <h5 style="margin: 0 0 8px 0; font-size: 13px; font-weight: 600;">Active Cryptographic Sessions</h5>
+                <div class="table-container" style="overflow-x: auto;">
+                  <table class="data-table" id="sessionsTable" style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                    <thead>
+                      <tr style="background: var(--surface-secondary); text-align: left; border-bottom: 1px solid var(--border);">
+                        <th style="padding: 8px 12px;">Session ID</th>
+                        <th style="padding: 8px 12px;">Created At</th>
+                        <th style="padding: 8px 12px;">Expires At</th>
+                        <th style="padding: 8px 12px;">IP Address</th>
+                        <th style="padding: 8px 12px;">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody id="sessionsTableBody">
+                      <tr><td colspan="5" style="padding: 16px; text-align: center; color: var(--text-secondary);">Loading sessions...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>

@@ -5,6 +5,53 @@ All notable changes to the 404 FOUNDERS project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to Phase-based Development Governance.
 
+## [Phase-11] - 2026-11-07
+
+### Added
+- **Authentication & Session Subsystem (`security/auth.py`):**
+  - Cryptographically secure password hashing using PBKDF2-HMAC-SHA256 (100,000 iterations, 16-byte random salt).
+  - Constant-time password verification using `secrets.compare_digest`.
+  - Hashed session storage using SHA-256 tokens (`404SESS-...`).
+  - Session lifecycle management: creation, TTL validation, single-session revocation, and global user logout.
+  - Automatic operator account bootstrapping.
+- **Durable Conversations & Activity Engine (`core/conversation_manager.py`):**
+  - `ConversationManager`: Thread CRUD, message appending/listing, user ID resolution, and cascade deletion.
+  - `UserSettingsManager`: Appearance theme, voice parameters, and memory retention window management.
+  - `ActivityLogManager`: Unified operational audit recording across intelligence, agent, learning, and auth domains.
+- **Database Schema Migration 2 (`database/schema.py`):**
+  - Added tables: `user_accounts`, `user_sessions`, `conversation_threads`, `conversation_messages`, `user_application_settings`, `activity_log_entries`.
+  - Added query performance indexes on tokens, sessions, threads, and activity logs.
+- **REST APIs & WebSocket Gateway (`api/rest/routes.py`, `api/websocket/handler.py`):**
+  - Full REST endpoints for Authentication (`/api/v1/auth/*`), Conversations (`/api/v1/conversations/*`), Settings (`/api/v1/settings`), Activity (`/api/v1/activity/history`), and Server-Sent Events streaming (`/api/v1/chat/stream`).
+  - WebSocket streaming gateway (`/ws/v1/stream`, `/ws/v1/chat`) emitting progressive status, token chunks, and completion receipts.
+- **gRPC Cluster Servicers (`api/grpc/`):**
+  - IDL definition: `founders_service.proto`.
+  - Servicers: `NeuralInferenceServicer`, `ClusterTelemetryServicer`, `TaskDispatchServicer`.
+- **9 Unified Frontend Workspaces (`frontend/public/`):**
+  - Organized navigation into 9 primary workspaces: General Intelligence, Personal AI, Coding Assistant, Cybersecurity, Multimodal, Memory & Learning, System Intelligence, Task & Activity History, and Settings.
+  - Live token streaming over WebSocket/SSE with fallback to REST.
+  - Speech-to-Text input via Web Speech API and Text-to-Speech audio output.
+  - Markdown code block formatting with one-click copy buttons.
+  - Active sessions table with live revocation controls and backend endpoint tester.
+- **Production Deployment Infrastructure:**
+  - `Dockerfile.backend` (Python 3.11-slim, PyTorch CPU, non-root user `founders`).
+  - `Dockerfile.frontend` (Node.js 20 Alpine, non-root user `node`).
+  - `docker-compose.yml` (development) and `docker-compose.prod.yml` (production with resource limits and Nginx reverse proxy).
+  - `nginx/nginx.conf` (reverse proxy with WebSocket upgrade and security headers).
+  - `scripts/deploy_check.py` (automated pre-flight verification report).
+  - `scripts/run_production.sh` (production startup script).
+- **Architecture Documentation:**
+  - [`docs/FRONTEND_ARCHITECTURE.md`](docs/FRONTEND_ARCHITECTURE.md) (`DOC-FRONT-001`)
+  - [`docs/BACKEND_API_ARCHITECTURE.md`](docs/BACKEND_API_ARCHITECTURE.md) (`DOC-API-002`)
+  - [`docs/DEPLOYMENT_GUIDE.md`](docs/DEPLOYMENT_GUIDE.md) (`DOC-DEP-001`)
+  - [`docs/SECURITY_GUIDE.md`](docs/SECURITY_GUIDE.md) (`DOC-SEC-002`)
+
+### Changed
+- CORS middleware in `api/rest/app.py` updated to allow `PUT`, `DELETE`, `PATCH`, `OPTIONS`, `GET`, `POST`.
+- Extended test suite to 323 automated tests (100% passing).
+
+---
+
 ## [Phase-10] - 2026-11-07
 
 ### Added

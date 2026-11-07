@@ -1017,3 +1017,160 @@ class RunTestsResponse(BaseModel):
     duration_seconds: float
     passed: bool
 
+
+# =============================================================================
+# PHASE 11 — AUTHENTICATION, CONVERSATION, SETTINGS & ACTIVITY SCHEMAS
+# =============================================================================
+
+class UserRegisterRequest(BaseModel):
+    """User registration payload."""
+    model_config = ConfigDict(extra="ignore")
+    username: str = Field(..., min_length=3, max_length=32, description="Alphanumeric username")
+    email: str = Field(..., description="Valid email address")
+    password: str = Field(..., min_length=8, description="Password (at least 8 characters)")
+    display_name: Optional[str] = Field(None, description="Human-friendly display name")
+
+
+class UserLoginRequest(BaseModel):
+    """User login payload."""
+    model_config = ConfigDict(extra="ignore")
+    username_or_email: str
+    password: str
+
+
+class AuthTokenResponse(BaseModel):
+    """Token response upon successful authentication."""
+    model_config = ConfigDict(extra="ignore")
+    token: str
+    token_type: str = "Bearer"
+    user_id: str
+    username: str
+    email: str
+    role: str
+    expires_at: str
+
+
+class UserProfileResponse(BaseModel):
+    """Current authenticated user profile."""
+    model_config = ConfigDict(extra="ignore")
+    user_id: str
+    username: str
+    email: str
+    display_name: str
+    role: str
+    is_active: bool
+    created_at: str
+    last_login_at: Optional[str] = None
+
+
+class UserSessionItemSchema(BaseModel):
+    """Active user session details."""
+    model_config = ConfigDict(extra="ignore")
+    session_id: str
+    created_at: str
+    expires_at: str
+    ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
+    is_active: bool
+
+
+class ConversationCreateRequest(BaseModel):
+    """Create conversation thread request."""
+    model_config = ConfigDict(extra="ignore")
+    title: str = Field("New Conversation", max_length=100)
+    mode: str = Field("GENERAL", description="GENERAL, CODING, CYBERSECURITY, PERSONAL_AI")
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class ConversationUpdateRequest(BaseModel):
+    """Update conversation thread metadata."""
+    model_config = ConfigDict(extra="ignore")
+    title: Optional[str] = None
+    mode: Optional[str] = None
+
+
+class ConversationThreadSchema(BaseModel):
+    """Conversation thread representation."""
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    user_id: str
+    title: str
+    mode: str
+    created_at: str
+    updated_at: str
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class ConversationMessageSchema(BaseModel):
+    """Individual conversation message representation."""
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    conversation_id: str
+    sender: str
+    content: str
+    message_type: str
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    created_at: str
+
+
+class MessageSendRequest(BaseModel):
+    """Send message to conversation thread."""
+    model_config = ConfigDict(extra="ignore")
+    content: str = Field(..., min_length=1)
+    message_type: str = "TEXT"
+    metadata: Optional[Dict[str, Any]] = None
+    stream: bool = False
+
+
+class UserSettingsSchema(BaseModel):
+    """Application user preferences schema."""
+    model_config = ConfigDict(extra="ignore")
+    user_id: str
+    theme_preference: str
+    language: str
+    voice_enabled: bool
+    tts_autoplay: bool
+    memory_retention_days: int
+    custom_endpoint_url: Optional[str] = None
+    updated_at: str
+
+
+class UserSettingsUpdateRequest(BaseModel):
+    """Update application preferences."""
+    model_config = ConfigDict(extra="ignore")
+    theme_preference: Optional[str] = None
+    language: Optional[str] = None
+    voice_enabled: Optional[bool] = None
+    tts_autoplay: Optional[bool] = None
+    memory_retention_days: Optional[int] = None
+    custom_endpoint_url: Optional[str] = None
+
+
+class ActivityLogSchema(BaseModel):
+    """Individual activity log entry."""
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    user_id: str
+    category: str
+    action: str
+    status: str
+    detail: Optional[str] = None
+    created_at: str
+
+
+class ActivityHistoryResponse(BaseModel):
+    """Activity history response."""
+    model_config = ConfigDict(extra="ignore")
+    total_count: int
+    entries: List[ActivityLogSchema]
+
+
+class ChatStreamRequest(BaseModel):
+    """Streaming chat prompt payload."""
+    model_config = ConfigDict(extra="ignore")
+    query: str
+    user_id: Optional[str] = "operator"
+    conversation_id: Optional[str] = None
+    mode: str = "GENERAL"
+
+

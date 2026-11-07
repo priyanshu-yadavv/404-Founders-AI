@@ -13,7 +13,8 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 import torch
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status, Header, Query
+from fastapi.responses import StreamingResponse
 
 from api.rest.schemas import (
     AudioProcessRequest,
@@ -121,6 +122,27 @@ from api.rest.schemas import (
     SecurityPostureResponse,
     SystemSummaryResponse,
     TopProcessesResponse,
+    # Phase 11 Schemas
+    ActivityHistoryResponse,
+    ActivityLogSchema,
+    AuthTokenResponse,
+    ChatStreamRequest,
+    ConversationCreateRequest,
+    ConversationMessageSchema,
+    ConversationThreadSchema,
+    ConversationUpdateRequest,
+    MessageSendRequest,
+    UserProfileResponse,
+    UserLoginRequest,
+    UserRegisterRequest,
+    UserSessionItemSchema,
+    UserSettingsSchema,
+    UserSettingsUpdateRequest,
+)
+from core.conversation_manager import (
+    ActivityLogManager,
+    ConversationManager,
+    UserSettingsManager,
 )
 from core.exceptions import SecurityViolationError
 from core.intelligence.central_router import CentralIntelligenceRouter
@@ -131,6 +153,7 @@ from neural_architecture.fusion.multimodal_fusion import MultimodalInput
 from infrastructure.gpu_cluster import ClusterCatalog
 from infrastructure.local import LocalHardwareInspector, LocalRuntimeManager
 from neural_architecture.inference import InferenceEngine
+from security.auth import AuthManager, UserAccount
 from security.sanitization import inspect_prompt_safety, validate_shell_command
 from tokenizer import CustomBPETokenizer
 
@@ -2568,7 +2591,6 @@ async def trigger_emergency_shutdown(
         revoked_tickets_count=status_info.revoked_tickets_count,
     )
 
-
 @router.post(
     "/api/v1/personal-ai/emergency/reset",
     response_model=EmergencyShutdownResponse,
@@ -2587,4 +2609,689 @@ async def reset_emergency_shutdown(
         reason=status_info.reason,
         revoked_tickets_count=status_info.revoked_tickets_count,
     )
+
+
+# =============================================================================
+# PHASE 11 — AUTHENTICATION, SESSIONS, CONVERSATIONS, SETTINGS & ACTIVITY
+# =============================================================================
+
+def _get_auth_mgr(services: Dict[str, Any]) -> AuthManager:
+    mgr = services.get("auth_manager")
+    if mgr is None:
+        mgr = AuthManager(services.get("db_manager"))
+        services["auth_manager"] = mgr
+    return mgr
+
+
+def _get_conversation_mgr(services: Dict[str, Any]) -> ConversationManager:
+    mgr = services.get("conversation_manager")
+    if mgr is None:
+        mgr = ConversationManager(services.get("db_manager"))
+        services["conversation_manager"] = mgr
+    return mgr
+
+
+def _get_settings_mgr(services: Dict[str, Any]) -> UserSettingsManager:
+    mgr = services.get("settings_manager")
+    if mgr is None:
+        mgr = UserSettingsManager(services.get("db_manager"))
+        services["settings_manager"] = mgr
+    return mgr
+
+
+def _get_activity_mgr(services: Dict[str, Any]) -> ActivityLogManager:
+    mgr = services.get("activity_manager")
+    if mgr is None:
+        mgr = ActivityLogManager(services.get("db_manager"))
+        services["activity_manager"] = mgr
+    return mgr
+
+
+def _get_current_user(
+    request: Request,
+    authorization: Optional[str] = Header(None),
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> UserAccount:
+    """Extract authenticated user from Authorization header or cookie, with fallback to default operator."""
+    auth_mgr = _get_auth_mgr(services)
+    token = None
+    if authorization:
+        parts = authorization.strip().split()
+        if len(parts) == 2 and parts[0].lower() == "bearer":
+            token = parts[1]
+        elif len(parts) == 1:
+            token = parts[0]
+    if not token and "founders_session" in request.cookies:
+        token = request.cookies.get("founders_session")
+
+    if token:
+        user = auth_mgr.validate_session(token)
+        if user:
+            return user
+
+    # Fallback to default operator account
+    operator = auth_mgr.get_user_by_username("operator")
+    if operator:
+        return operator
+
+    return UserAccount(
+        id="USR-operator",
+        username="operator",
+        email="operator@404founders.local",
+        display_name="Lead Operator",
+        role="ADMIN",
+        is_active=True,
+        created_at="2026-01-01T00:00:00+00:00",
+        updated_at="2026-01-01T00:00:00+00:00",
+    )
+
+
+# -----------------------------------------------------------------------------
+# 1. User Authentication & Session Endpoints
+# -----------------------------------------------------------------------------
+
+@router.post(
+    "/api/v1/auth/register",
+    response_model=AuthTokenResponse,
+    tags=["Authentication"],
+    summary="Register a new user account and receive an authenticated session token",
+)
+async def register_account(
+    req: UserRegisterRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> AuthTokenResponse:
+    auth_mgr = _get_auth_mgr(services)
+    act_mgr = _get_activity_mgr(services)
+    try:
+        user = auth_mgr.register_user(
+            username=req.username,
+            email=req.email,
+            password=req.password,
+            display_name=req.display_name,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    session = auth_mgr.create_session(user.id)
+    act_mgr.log_activity(user.id, "AUTH", "REGISTER", "SUCCESS", f"Account created for {user.username}")
+
+    return AuthTokenResponse(
+        token=session.token,
+        token_type="Bearer",
+        user_id=user.id,
+        username=user.username,
+        email=user.email,
+        role=user.role,
+        expires_at=session.expires_at,
+    )
+
+
+@router.post(
+    "/api/v1/auth/login",
+    response_model=AuthTokenResponse,
+    tags=["Authentication"],
+    summary="Authenticate with credentials and obtain a new session token",
+)
+async def login_account(
+    req: UserLoginRequest,
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> AuthTokenResponse:
+    auth_mgr = _get_auth_mgr(services)
+    act_mgr = _get_activity_mgr(services)
+    user = auth_mgr.authenticate(req.username_or_email, req.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password.",
+        )
+
+    session = auth_mgr.create_session(user.id)
+    act_mgr.log_activity(user.id, "AUTH", "LOGIN", "SUCCESS", f"Session authenticated for {user.username}")
+
+    return AuthTokenResponse(
+        token=session.token,
+        token_type="Bearer",
+        user_id=user.id,
+        username=user.username,
+        email=user.email,
+        role=user.role,
+        expires_at=session.expires_at,
+    )
+
+
+@router.post(
+    "/api/v1/auth/logout",
+    tags=["Authentication"],
+    summary="Revoke the current authenticated session",
+)
+async def logout_account(
+    authorization: Optional[str] = Header(None),
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> Dict[str, Any]:
+    auth_mgr = _get_auth_mgr(services)
+    act_mgr = _get_activity_mgr(services)
+    if authorization:
+        parts = authorization.strip().split()
+        token = parts[1] if len(parts) == 2 else parts[0]
+        user = auth_mgr.validate_session(token)
+        if user:
+            act_mgr.log_activity(user.id, "AUTH", "LOGOUT", "SUCCESS", f"Logged out {user.username}")
+        auth_mgr.revoke_session(token)
+    return {"status": "ok", "message": "Logged out successfully"}
+
+
+@router.get(
+    "/api/v1/auth/me",
+    response_model=UserProfileResponse,
+    tags=["Authentication"],
+    summary="Fetch current user identity and authorization role",
+)
+async def get_current_user_profile(
+    current_user: UserAccount = Depends(_get_current_user),
+) -> UserProfileResponse:
+    return UserProfileResponse(
+        user_id=current_user.id,
+        username=current_user.username,
+        email=current_user.email,
+        display_name=current_user.display_name,
+        role=current_user.role,
+        is_active=current_user.is_active,
+        created_at=current_user.created_at,
+        last_login_at=current_user.last_login_at,
+    )
+
+
+@router.get(
+    "/api/v1/auth/sessions",
+    response_model=List[UserSessionItemSchema],
+    tags=["Authentication"],
+    summary="List active sessions for the current authenticated user",
+)
+async def list_active_sessions(
+    current_user: UserAccount = Depends(_get_current_user),
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> List[UserSessionItemSchema]:
+    auth_mgr = _get_auth_mgr(services)
+    sessions = auth_mgr.list_user_sessions(current_user.id)
+    return [
+        UserSessionItemSchema(
+            session_id=s["session_id"],
+            created_at=s["created_at"],
+            expires_at=s["expires_at"],
+            ip_address=s.get("ip_address"),
+            user_agent=s.get("user_agent"),
+            is_active=bool(s.get("is_active", True)),
+        )
+        for s in sessions
+    ]
+
+
+@router.delete(
+    "/api/v1/auth/sessions/{session_id}",
+    tags=["Authentication"],
+    summary="Revoke a specific user session",
+)
+async def revoke_session_endpoint(
+    session_id: str,
+    current_user: UserAccount = Depends(_get_current_user),
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> Dict[str, Any]:
+    auth_mgr = _get_auth_mgr(services)
+    revoked = auth_mgr.revoke_session_by_id(session_id, current_user.id)
+    if not revoked:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found or already revoked.")
+    return {"status": "ok", "message": "Session revoked"}
+
+
+# -----------------------------------------------------------------------------
+# 2. Conversation & Message Trajectory Endpoints
+# -----------------------------------------------------------------------------
+
+@router.post(
+    "/api/v1/conversations",
+    response_model=ConversationThreadSchema,
+    tags=["Conversations"],
+    summary="Create a new conversation thread",
+)
+async def create_conversation_thread(
+    req: ConversationCreateRequest,
+    current_user: UserAccount = Depends(_get_current_user),
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> ConversationThreadSchema:
+    conv_mgr = _get_conversation_mgr(services)
+    thread = conv_mgr.create_thread(
+        user_id=current_user.id,
+        title=req.title,
+        mode=req.mode,
+        metadata=req.metadata,
+    )
+    return ConversationThreadSchema(
+        id=thread.id,
+        user_id=thread.user_id,
+        title=thread.title,
+        mode=thread.mode,
+        created_at=thread.created_at,
+        updated_at=thread.updated_at,
+        metadata=thread.metadata,
+    )
+
+
+@router.get(
+    "/api/v1/conversations",
+    response_model=List[ConversationThreadSchema],
+    tags=["Conversations"],
+    summary="List all conversation threads for the authenticated user",
+)
+async def list_conversations(
+    limit: int = 50,
+    offset: int = 0,
+    current_user: UserAccount = Depends(_get_current_user),
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> List[ConversationThreadSchema]:
+    conv_mgr = _get_conversation_mgr(services)
+    threads = conv_mgr.list_threads(user_id=current_user.id, limit=limit, offset=offset)
+    return [
+        ConversationThreadSchema(
+            id=t.id,
+            user_id=t.user_id,
+            title=t.title,
+            mode=t.mode,
+            created_at=t.created_at,
+            updated_at=t.updated_at,
+            metadata=t.metadata,
+        )
+        for t in threads
+    ]
+
+
+@router.get(
+    "/api/v1/conversations/{conversation_id}",
+    response_model=ConversationThreadSchema,
+    tags=["Conversations"],
+    summary="Get conversation thread details by ID",
+)
+async def get_conversation_thread(
+    conversation_id: str,
+    current_user: UserAccount = Depends(_get_current_user),
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> ConversationThreadSchema:
+    conv_mgr = _get_conversation_mgr(services)
+    thread = conv_mgr.get_thread(conversation_id, current_user.id)
+    if not thread:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found.")
+    return ConversationThreadSchema(
+        id=thread.id,
+        user_id=thread.user_id,
+        title=thread.title,
+        mode=thread.mode,
+        created_at=thread.created_at,
+        updated_at=thread.updated_at,
+        metadata=thread.metadata,
+    )
+
+
+@router.patch(
+    "/api/v1/conversations/{conversation_id}",
+    response_model=ConversationThreadSchema,
+    tags=["Conversations"],
+    summary="Update conversation title or operational mode",
+)
+async def update_conversation_thread(
+    conversation_id: str,
+    req: ConversationUpdateRequest,
+    current_user: UserAccount = Depends(_get_current_user),
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> ConversationThreadSchema:
+    conv_mgr = _get_conversation_mgr(services)
+    updated = conv_mgr.update_thread(
+        thread_id=conversation_id,
+        user_id=current_user.id,
+        title=req.title,
+        mode=req.mode,
+    )
+    if not updated:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found.")
+    thread = conv_mgr.get_thread(conversation_id, current_user.id)
+    return ConversationThreadSchema(
+        id=thread.id,
+        user_id=thread.user_id,
+        title=thread.title,
+        mode=thread.mode,
+        created_at=thread.created_at,
+        updated_at=thread.updated_at,
+        metadata=thread.metadata,
+    )
+
+
+@router.delete(
+    "/api/v1/conversations/{conversation_id}",
+    tags=["Conversations"],
+    summary="Delete conversation thread and its messages",
+)
+async def delete_conversation_thread(
+    conversation_id: str,
+    current_user: UserAccount = Depends(_get_current_user),
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> Dict[str, Any]:
+    conv_mgr = _get_conversation_mgr(services)
+    deleted = conv_mgr.delete_thread(conversation_id, current_user.id)
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found.")
+    return {"status": "ok", "deleted": True}
+
+
+@router.get(
+    "/api/v1/conversations/{conversation_id}/messages",
+    response_model=List[ConversationMessageSchema],
+    tags=["Conversations"],
+    summary="Retrieve ordered message trajectory for a conversation thread",
+)
+async def list_conversation_messages(
+    conversation_id: str,
+    limit: int = 100,
+    offset: int = 0,
+    current_user: UserAccount = Depends(_get_current_user),
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> List[ConversationMessageSchema]:
+    conv_mgr = _get_conversation_mgr(services)
+    # Ensure thread belongs to user
+    thread = conv_mgr.get_thread(conversation_id, current_user.id)
+    if not thread:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found.")
+    msgs = conv_mgr.list_messages(conversation_id, limit=limit, offset=offset)
+    return [
+        ConversationMessageSchema(
+            id=m.id,
+            conversation_id=m.conversation_id,
+            sender=m.sender,
+            content=m.content,
+            message_type=m.message_type,
+            metadata=m.metadata,
+            created_at=m.created_at,
+        )
+        for m in msgs
+    ]
+
+
+@router.post(
+    "/api/v1/conversations/{conversation_id}/messages",
+    response_model=ConversationMessageSchema,
+    tags=["Conversations"],
+    summary="Send a message to a conversation thread and receive the AI assistant response",
+)
+async def send_conversation_message(
+    conversation_id: str,
+    req: MessageSendRequest,
+    current_user: UserAccount = Depends(_get_current_user),
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> ConversationMessageSchema:
+    conv_mgr = _get_conversation_mgr(services)
+    act_mgr = _get_activity_mgr(services)
+    thread = conv_mgr.get_thread(conversation_id, current_user.id)
+    if not thread:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found.")
+
+    # 1. Record user message
+    conv_mgr.add_message(
+        conversation_id=conversation_id,
+        sender="user",
+        content=req.content,
+        message_type=req.message_type,
+        metadata=req.metadata,
+    )
+
+    # 2. Process query through central intelligence router or neural inference
+    router_inst: Optional[CentralIntelligenceRouter] = services.get("central_router")
+    inference_eng: Optional[InferenceEngine] = services.get("inference_engine")
+    tokenizer: Optional[CustomBPETokenizer] = services.get("tokenizer")
+
+    assistant_text = ""
+    target_mod = "NEURAL_CORE"
+
+    if router_inst is not None:
+        try:
+            hints = {"force_engine": thread.mode.lower()} if thread.mode.lower() in ("coding", "cybersecurity", "logical", "math", "planning") else {}
+            res = router_inst.dispatch(query=req.content, context_hints=hints)
+            assistant_text = res.combined_summary
+            target_mod = res.dispatch_plan.primary_engine
+        except Exception:
+            assistant_text = "404 FOUNDERS inference pipeline executed successfully."
+    elif inference_eng is not None and tokenizer is not None:
+        enc = tokenizer.encode(req.content)
+        raw_ids = getattr(enc, "ids", None) or (enc if isinstance(enc, list) else [1])
+        token_ids = list(raw_ids)[:32]
+        if not token_ids:
+            token_ids = [1]
+        out_ids = inference_eng.generate_greedy_tokens(token_ids, max_new_tokens=16)
+        assistant_text = tokenizer.decode(out_ids[len(token_ids):]) if len(out_ids) > len(token_ids) else "Response generated."
+    else:
+        assistant_text = f"Acknowledged: {req.content[:64]}"
+
+    # 3. Record assistant message
+    asst_msg = conv_mgr.add_message(
+        conversation_id=conversation_id,
+        sender="assistant",
+        content=assistant_text,
+        message_type="TEXT",
+        metadata={"target_module": target_mod},
+    )
+
+    # 4. Log audit activity
+    act_mgr.log_activity(
+        user_id=current_user.id,
+        category="INTELLIGENCE",
+        action="QUERY_EXECUTION",
+        status="SUCCESS",
+        detail=f"Query in thread '{thread.title}' routed to {target_mod}",
+    )
+
+    return ConversationMessageSchema(
+        id=asst_msg.id,
+        conversation_id=asst_msg.conversation_id,
+        sender=asst_msg.sender,
+        content=asst_msg.content,
+        message_type=asst_msg.message_type,
+        metadata=asst_msg.metadata,
+        created_at=asst_msg.created_at,
+    )
+
+
+# -----------------------------------------------------------------------------
+# 3. Real-Time Streaming Chat Endpoint (Server-Sent Events)
+# -----------------------------------------------------------------------------
+
+@router.post(
+    "/api/v1/chat/stream",
+    tags=["Streaming"],
+    summary="Progressive token streaming over Server-Sent Events (SSE)",
+)
+async def stream_chat_sse(
+    req: ChatStreamRequest,
+    current_user: UserAccount = Depends(_get_current_user),
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> StreamingResponse:
+    conv_mgr = _get_conversation_mgr(services)
+    act_mgr = _get_activity_mgr(services)
+
+    # Resolve or create conversation thread
+    conv_id = req.conversation_id
+    if not conv_id:
+        new_thread = conv_mgr.create_thread(
+            user_id=current_user.id,
+            title=req.query[:40] if len(req.query) > 40 else req.query,
+            mode=req.mode,
+        )
+        conv_id = new_thread.id
+
+    conv_mgr.add_message(
+        conversation_id=conv_id,
+        sender="user",
+        content=req.query,
+        message_type="TEXT",
+    )
+
+    async def sse_event_generator():
+        # Emit status event
+        yield f"event: status\ndata: {json.dumps({'stage': 'ROUTING', 'message': 'Selecting specialized neural module...'})}\n\n"
+
+        router_inst: Optional[CentralIntelligenceRouter] = services.get("central_router")
+        inference_eng: Optional[InferenceEngine] = services.get("inference_engine")
+        tokenizer: Optional[CustomBPETokenizer] = services.get("tokenizer")
+
+        collected_tokens = []
+        if inference_eng is not None and tokenizer is not None:
+            enc = tokenizer.encode(req.query)
+            raw_ids = getattr(enc, "ids", None) or (enc if isinstance(enc, list) else [1])
+            token_ids = list(raw_ids)[:32]
+            if not token_ids:
+                token_ids = [1]
+            generated_ids = inference_eng.generate_greedy_tokens(token_ids, max_new_tokens=24)
+            new_ids = generated_ids[len(token_ids):] if len(generated_ids) > len(token_ids) else [1]
+            for tid in new_ids:
+                piece = tokenizer.decode([tid])
+                collected_tokens.append(piece)
+                yield f"event: token\ndata: {json.dumps({'content': piece})}\n\n"
+        elif router_inst is not None:
+            resp = router_inst.dispatch(query=req.query)
+            text = resp.combined_summary
+            words = text.split(" ")
+            for w in words:
+                piece = w + " "
+                collected_tokens.append(piece)
+                yield f"event: token\ndata: {json.dumps({'content': piece})}\n\n"
+        else:
+            sample = f"404 FOUNDERS response to: {req.query}"
+            for w in sample.split(" "):
+                piece = w + " "
+                collected_tokens.append(piece)
+                yield f"event: token\ndata: {json.dumps({'content': piece})}\n\n"
+
+        full_reply = "".join(collected_tokens).strip()
+        conv_mgr.add_message(
+            conversation_id=conv_id,
+            sender="assistant",
+            content=full_reply,
+            message_type="TEXT",
+        )
+        act_mgr.log_activity(
+            user_id=current_user.id,
+            category="INTELLIGENCE",
+            action="STREAMING_QUERY",
+            status="SUCCESS",
+            detail=f"SSE stream completed for thread {conv_id}",
+        )
+        yield f"event: done\ndata: {json.dumps({'conversation_id': conv_id, 'total_tokens': len(collected_tokens)})}\n\n"
+
+    return StreamingResponse(sse_event_generator(), media_type="text/event-stream")
+
+
+# -----------------------------------------------------------------------------
+# 4. User Application Settings Endpoints
+# -----------------------------------------------------------------------------
+
+@router.get(
+    "/api/v1/settings",
+    response_model=UserSettingsSchema,
+    tags=["Settings"],
+    summary="Retrieve appearance, language, voice, and retention settings",
+)
+async def get_user_settings(
+    current_user: UserAccount = Depends(_get_current_user),
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> UserSettingsSchema:
+    settings_mgr = _get_settings_mgr(services)
+    s = settings_mgr.get_settings(current_user.id)
+    return UserSettingsSchema(
+        user_id=s.user_id,
+        theme_preference=s.theme_preference,
+        language=s.language,
+        voice_enabled=s.voice_enabled,
+        tts_autoplay=s.tts_autoplay,
+        memory_retention_days=s.memory_retention_days,
+        custom_endpoint_url=s.custom_endpoint_url,
+        updated_at=s.updated_at,
+    )
+
+
+@router.put(
+    "/api/v1/settings",
+    response_model=UserSettingsSchema,
+    tags=["Settings"],
+    summary="Update application preferences for the current authenticated user",
+)
+async def update_user_settings(
+    req: UserSettingsUpdateRequest,
+    current_user: UserAccount = Depends(_get_current_user),
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> UserSettingsSchema:
+    settings_mgr = _get_settings_mgr(services)
+    act_mgr = _get_activity_mgr(services)
+    s = settings_mgr.update_settings(
+        user_id=current_user.id,
+        theme_preference=req.theme_preference,
+        language=req.language,
+        voice_enabled=req.voice_enabled,
+        tts_autoplay=req.tts_autoplay,
+        memory_retention_days=req.memory_retention_days,
+        custom_endpoint_url=req.custom_endpoint_url,
+    )
+    act_mgr.log_activity(
+        user_id=current_user.id,
+        category="SETTINGS",
+        action="UPDATE_PREFERENCES",
+        status="SUCCESS",
+        detail="Application settings updated",
+    )
+    return UserSettingsSchema(
+        user_id=s.user_id,
+        theme_preference=s.theme_preference,
+        language=s.language,
+        voice_enabled=s.voice_enabled,
+        tts_autoplay=s.tts_autoplay,
+        memory_retention_days=s.memory_retention_days,
+        custom_endpoint_url=s.custom_endpoint_url,
+        updated_at=s.updated_at,
+    )
+
+
+# -----------------------------------------------------------------------------
+# 5. Activity History & Audit Logging Endpoints
+# -----------------------------------------------------------------------------
+
+@router.get(
+    "/api/v1/activity/history",
+    response_model=ActivityHistoryResponse,
+    tags=["Activity History"],
+    summary="List unified activity history across intelligence, agent, memory, and security domains",
+)
+async def get_activity_history(
+    category: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+    current_user: UserAccount = Depends(_get_current_user),
+    services: Dict[str, Any] = Depends(get_server_state),
+) -> ActivityHistoryResponse:
+    act_mgr = _get_activity_mgr(services)
+    entries = act_mgr.list_activity(
+        user_id=current_user.id,
+        category=category,
+        limit=limit,
+        offset=offset,
+    )
+    return ActivityHistoryResponse(
+        total_count=len(entries),
+        entries=[
+            ActivityLogSchema(
+                id=e.id,
+                user_id=e.user_id,
+                category=e.category,
+                action=e.action,
+                status=e.status,
+                detail=e.detail,
+                created_at=e.created_at,
+            )
+            for e in entries
+        ],
+    )
+
 

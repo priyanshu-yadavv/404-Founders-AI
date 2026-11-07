@@ -4,7 +4,92 @@
  * Communicates with FastAPI backend on http://127.0.0.1:8000
  */
 
-const API_BASE = 'http://127.0.0.1:8000';
+let API_BASE = localStorage.getItem('404_founders_endpoint') || 'http://127.0.0.1:8000';
+let authToken = localStorage.getItem('404_founders_token') || '';
+let currentConversationId = localStorage.getItem('404_founders_active_thread') || null;
+let lastUserPrompt = '';
+
+function getAuthHeaders() {
+  const headers = { 'Content-Type': 'application/json' };
+  if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+  return headers;
+}
+
+function showToast(message) {
+  const existing = document.querySelector('.toast-notification');
+  if (existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.className = 'toast-notification';
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    setTimeout(() => toast.remove(), 300);
+  }, 2200);
+}
+
+function copyText(text) {
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('Copied to clipboard');
+  }).catch(() => {
+    showToast('Failed to copy');
+  });
+}
+
+window.copyCode = function(btn) {
+  const codeEl = btn.parentElement.querySelector('code');
+  if (codeEl) {
+    copyText(codeEl.innerText);
+  }
+};
+
+function renderMarkdownContent(text) {
+  if (!text) return '';
+  // 1. Replace code blocks
+  let formatted = text.replace(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g, (match, lang, code) => {
+    return `<div class="code-container"><button class="code-copy-btn" onclick="copyCode(this)">Copy</button><pre><code>${escapeHtml(code.trim())}</code></pre></div>`;
+  });
+  // 2. Replace inline code
+  formatted = formatted.replace(/`([^`]+)`/g, '<code>$1</code>');
+  // 3. Replace bold
+  formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  return formatted;
+}
+
+function renderMessageActions(text, sender, msgId = '') {
+  const isUser = sender === 'user';
+  return `
+    <div class="msg-actions">
+      <button class="msg-action-btn" onclick="copyText(${JSON.stringify(text)})" title="Copy text">📋 Copy</button>
+      ${isUser ? `<button class="msg-action-btn" onclick="editUserMessage(${JSON.stringify(text)})" title="Edit prompt in composer">✏️ Edit</button>` : ''}
+      ${!isUser ? `<button class="msg-action-btn" onclick="regenerateLastResponse()" title="Regenerate response">🔄 Regenerate</button>` : ''}
+      ${!isUser ? `<button class="msg-action-btn" onclick="speakMessageText(${JSON.stringify(text)})" title="Speak message aloud">🔊 Speak</button>` : ''}
+    </div>
+  `;
+}
+
+window.editUserMessage = function(text) {
+  const composer = document.getElementById('composerText');
+  if (composer) {
+    composer.value = text;
+    composer.focus();
+    showToast('Prompt placed in composer');
+  }
+};
+
+window.speakMessageText = function(text) {
+  if (!('speechSynthesis' in window)) {
+    showToast('Web Speech API not supported in this browser');
+    return;
+  }
+  window.speechSynthesis.cancel();
+  const clean = text.replace(/[`*_#]/g, '');
+  const utterance = new SpeechSynthesisUtterance(clean);
+  const langSel = document.getElementById('settingsLanguage');
+  utterance.lang = langSel ? langSel.value : 'en';
+  window.speechSynthesis.speak(utterance);
+  showToast('Playing speech output');
+};
 
 // Navigation & View Meta
 const viewMetadata = {
@@ -35,6 +120,14 @@ const viewMetadata = {
   'personal-ai': {
     title: 'Personal AI Agent & Local Workstation Controller',
     subtitle: 'Zero-fabrication telemetry, sandboxed file assistant, command safety advisor, and approval workflow'
+  },
+  activity: {
+    title: 'Task & Activity Ledger',
+    subtitle: 'Unified operational audit across neural routing, Personal AI, memory, and security'
+  },
+  settings: {
+    title: 'Application & Account Settings',
+    subtitle: 'Appearance themes, cryptographic sessions, voice parameters, and endpoint configuration'
   },
   api: {
     title: 'API Specifications & Interactive Docs',
@@ -135,6 +228,10 @@ function switchView(viewKey) {
     fetchPersonalAIProcesses();
     fetchPersonalAIApprovals();
     fetchPersonalAIAuditLogs();
+  } else if (viewKey === 'activity') {
+    fetchActivityHistory();
+  } else if (viewKey === 'settings') {
+    fetchSettings();
   }
 }
 
@@ -284,10 +381,13 @@ async function sendChatMessage() {
     if (v) attachedBadges += `<span class="badge-outline" style="margin-right: 4px;">${v.icon} ${escapeHtml(v.name)}</span>`;
   }
 
+  lastUserPrompt = prompt;
+
   userMsgEl.innerHTML = `
     <div class="message-sender">User &bull; ${hasAttachments ? 'Multimodal Payload' : 'Interactive Query'}</div>
     ${attachedBadges ? `<div style="margin-bottom: 6px;">${attachedBadges}</div>` : ''}
-    <div class="message-bubble">${escapeHtml(prompt || '(Attached media payload)')}</div>
+    <div class="message-bubble">${renderMarkdownContent(prompt || '(Attached media payload)')}</div>
+    ${renderMessageActions(prompt, 'user')}
   `;
   chatThread.appendChild(userMsgEl);
 
@@ -309,6 +409,14 @@ async function sendChatMessage() {
   chatThread.scrollTop = chatThread.scrollHeight;
 
   const startTime = performance.now();
+
+  const chkLive = document.getElementById('chkLiveStreaming');
+  if (chkLive && chkLive.checked && !hasAttachments && prompt) {
+    streamViaWebSocket(prompt, pendingEl, startTime);
+    btnSend.disabled = false;
+    btnSend.textContent = 'Execute Multimodal Query';
+    return;
+  }
 
   try {
     if (hasAttachments || isMultimodalQuery) {
@@ -1863,6 +1971,462 @@ function initPersonalAI() {
 }
 
 // -------------------------------------------------------------------------
+// Phase 11: Conversations, Streaming, Voice, Activity & Settings
+// -------------------------------------------------------------------------
+
+async function initConversationManager() {
+  const btnNewChat = document.getElementById('btnNewChat');
+  const btnDeleteThread = document.getElementById('btnDeleteThread');
+  const threadSelector = document.getElementById('threadSelector');
+
+  if (btnNewChat) btnNewChat.addEventListener('click', createNewConversation);
+  if (btnDeleteThread) btnDeleteThread.addEventListener('click', deleteActiveConversation);
+  if (threadSelector) {
+    threadSelector.addEventListener('change', (e) => {
+      switchConversation(e.target.value);
+    });
+  }
+
+  await loadConversations();
+}
+
+async function loadConversations() {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/conversations`, {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) return;
+    const threads = await res.json();
+    const selector = document.getElementById('threadSelector');
+    if (!selector) return;
+
+    selector.innerHTML = '';
+    if (threads.length === 0) {
+      await createNewConversation();
+      return;
+    }
+
+    threads.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = `${t.title} (${t.mode})`;
+      if (t.id === currentConversationId) opt.selected = true;
+      selector.appendChild(opt);
+    });
+
+    if (!currentConversationId && threads.length > 0) {
+      currentConversationId = threads[0].id;
+      localStorage.setItem('404_founders_active_thread', currentConversationId);
+    }
+  } catch (err) {
+    console.warn('Failed to load conversations:', err);
+  }
+}
+
+async function createNewConversation() {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/conversations`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        title: `Chat ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+        mode: 'GENERAL',
+      }),
+    });
+    if (!res.ok) return;
+    const thread = await res.json();
+    currentConversationId = thread.id;
+    localStorage.setItem('404_founders_active_thread', currentConversationId);
+    await loadConversations();
+    const chatThread = document.getElementById('chatThread');
+    if (chatThread) {
+      chatThread.innerHTML = `
+        <div class="message-item assistant">
+          <div class="message-sender">404 FOUNDERS Neural Core &bull; Random Init</div>
+          <div class="message-bubble">New conversation initiated. Thread ID: ${escapeHtml(thread.id)}</div>
+          <div class="message-metadata"><span>Mode: GENERAL</span></div>
+        </div>
+      `;
+    }
+    showToast('New conversation created');
+  } catch (err) {
+    showToast('Failed to create conversation');
+  }
+}
+
+async function deleteActiveConversation() {
+  if (!currentConversationId) return;
+  if (!confirm('Are you sure you want to delete this conversation thread?')) return;
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/conversations/${currentConversationId}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+    if (res.ok) {
+      currentConversationId = null;
+      localStorage.removeItem('404_founders_active_thread');
+      await loadConversations();
+      showToast('Conversation deleted');
+    }
+  } catch (err) {
+    showToast('Failed to delete conversation');
+  }
+}
+
+async function switchConversation(id) {
+  currentConversationId = id;
+  localStorage.setItem('404_founders_active_thread', id);
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/conversations/${id}/messages`, {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) return;
+    const msgs = await res.json();
+    const chatThread = document.getElementById('chatThread');
+    if (!chatThread) return;
+
+    chatThread.innerHTML = '';
+    msgs.forEach(m => {
+      const el = document.createElement('div');
+      el.className = `message-item ${m.sender}`;
+      el.innerHTML = `
+        <div class="message-sender">${m.sender === 'user' ? 'User' : '404 FOUNDERS Engine'} &bull; ${escapeHtml(m.message_type)}</div>
+        <div class="message-bubble">${renderMarkdownContent(m.content)}</div>
+        ${renderMessageActions(m.content, m.sender, m.id)}
+      `;
+      chatThread.appendChild(el);
+    });
+    chatThread.scrollTop = chatThread.scrollHeight;
+  } catch (err) {
+    console.warn('Failed to switch conversation:', err);
+  }
+}
+
+function initVoiceRecording() {
+  const btnRecordMic = document.getElementById('btnRecordMic');
+  if (!btnRecordMic) return;
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    btnRecordMic.title = 'Speech Recognition not supported in this browser';
+    btnRecordMic.disabled = true;
+    return;
+  }
+
+  let recognition = new SpeechRecognition();
+  recognition.continuous = false;
+  recognition.interimResults = true;
+  let isRecording = false;
+
+  btnRecordMic.addEventListener('click', () => {
+    const langSel = document.getElementById('settingsLanguage');
+    recognition.lang = langSel ? langSel.value : 'en-US';
+
+    if (!isRecording) {
+      try {
+        recognition.start();
+        isRecording = true;
+        btnRecordMic.classList.add('recording-active');
+        btnRecordMic.textContent = '⏹️ Stop';
+        showToast('Listening... Speak now');
+      } catch (e) {
+        console.error(e);
+      }
+    } else {
+      recognition.stop();
+      isRecording = false;
+      btnRecordMic.classList.remove('recording-active');
+      btnRecordMic.textContent = '🎤 Voice';
+    }
+  });
+
+  recognition.onresult = (event) => {
+    let transcript = '';
+    for (let i = event.resultIndex; i < event.results.length; ++i) {
+      transcript += event.results[i][0].transcript;
+    }
+    const composer = document.getElementById('composerText');
+    if (composer && transcript) {
+      composer.value = transcript;
+    }
+  };
+
+  recognition.onerror = (event) => {
+    isRecording = false;
+    btnRecordMic.classList.remove('recording-active');
+    btnRecordMic.textContent = '🎤 Voice';
+    showToast(`Speech recognition error: ${event.error}`);
+  };
+
+  recognition.onend = () => {
+    isRecording = false;
+    btnRecordMic.classList.remove('recording-active');
+    btnRecordMic.textContent = '🎤 Voice';
+  };
+}
+
+async function streamViaWebSocket(prompt, pendingEl, startTime) {
+  const wsUrl = (API_BASE.replace(/^http/, 'ws')) + '/ws/v1/chat';
+  let collectedText = '';
+
+  try {
+    const socket = new WebSocket(wsUrl);
+
+    socket.onopen = () => {
+      socket.send(JSON.stringify({
+        action: 'chat',
+        query: prompt,
+        user_id: 'operator',
+        conversation_id: currentConversationId,
+      }));
+    };
+
+    socket.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'status') {
+          pendingEl.querySelector('.message-bubble').textContent = `[${msg.stage}] ${msg.detail || msg.message || 'Processing...'}`;
+        } else if (msg.type === 'token') {
+          collectedText += msg.content;
+          pendingEl.querySelector('.message-bubble').innerHTML = renderMarkdownContent(collectedText);
+        } else if (msg.type === 'done') {
+          const elapsed = (performance.now() - startTime).toFixed(1);
+          pendingEl.innerHTML = `
+            <div class="message-sender">404 FOUNDERS Neural Core &bull; Streamed</div>
+            <div class="message-bubble">${renderMarkdownContent(msg.full_response || collectedText)}</div>
+            ${renderMessageActions(msg.full_response || collectedText, 'assistant')}
+            <div class="message-metadata">
+              <span>Latency: ${elapsed} ms</span>
+              <span>Module: ${escapeHtml(msg.module || 'NEURAL_CORE')}</span>
+              <span>Streaming: Active</span>
+            </div>
+          `;
+          socket.close();
+        } else if (msg.type === 'error') {
+          throw new Error(msg.message);
+        }
+      } catch (err) {
+        console.error('WebSocket parse error:', err);
+      }
+    };
+
+    socket.onerror = (err) => {
+      console.warn('WebSocket failed, falling back to REST/SSE:', err);
+      socket.close();
+      fallbackRestQuery(prompt, pendingEl, startTime);
+    };
+  } catch (err) {
+    fallbackRestQuery(prompt, pendingEl, startTime);
+  }
+}
+
+async function fallbackRestQuery(prompt, pendingEl, startTime) {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/conversations/${currentConversationId || 'default'}/messages`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ content: prompt, message_type: 'TEXT' }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const elapsed = (performance.now() - startTime).toFixed(1);
+    pendingEl.innerHTML = `
+      <div class="message-sender">404 FOUNDERS Engine &bull; Fallback</div>
+      <div class="message-bubble">${renderMarkdownContent(data.content)}</div>
+      ${renderMessageActions(data.content, 'assistant', data.id)}
+      <div class="message-metadata"><span>Latency: ${elapsed} ms</span></div>
+    `;
+  } catch (e) {
+    pendingEl.innerHTML = `
+      <div class="message-sender">Execution Error</div>
+      <div class="message-bubble" style="color: var(--status-error);">${escapeHtml(e.message)}</div>
+    `;
+  }
+}
+
+async function fetchActivityHistory() {
+  const tbody = document.getElementById('activityTableBody');
+  const catFilter = document.getElementById('activityCategoryFilter');
+  const category = catFilter ? catFilter.value : '';
+
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="6" style="padding: 24px; text-align: center; color: var(--text-secondary);">Loading activity events...</td></tr>';
+
+  try {
+    const url = new URL(`${API_BASE}/api/v1/activity/history`);
+    if (category) url.searchParams.set('category', category);
+    url.searchParams.set('limit', '50');
+
+    const res = await fetch(url.toString(), { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    if (!data.entries || data.entries.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="padding: 24px; text-align: center; color: var(--text-secondary);">No activity records found.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = data.entries.map(e => {
+      const statusClass = e.status.toLowerCase();
+      const timeStr = new Date(e.created_at).toLocaleString();
+      return `
+        <tr style="border-bottom: 1px solid var(--border);">
+          <td style="padding: 8px 14px; font-size: 11.5px; color: var(--text-secondary); white-space: nowrap;">${escapeHtml(timeStr)}</td>
+          <td style="padding: 8px 14px; font-weight: 500;">${escapeHtml(e.user_id)}</td>
+          <td style="padding: 8px 14px;"><span class="badge-outline">${escapeHtml(e.category)}</span></td>
+          <td style="padding: 8px 14px; font-weight: 500;">${escapeHtml(e.action)}</td>
+          <td style="padding: 8px 14px;"><span class="badge-status ${escapeHtml(statusClass)}">${escapeHtml(e.status)}</span></td>
+          <td style="padding: 8px 14px; color: var(--text-secondary); max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(e.detail || '—')}</td>
+        </tr>
+      `;
+    }).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="6" style="padding: 24px; text-align: center; color: var(--status-error);">Failed to fetch activity: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+async function fetchSettings() {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/settings`, { headers: getAuthHeaders() });
+    if (res.ok) {
+      const s = await res.json();
+      const themeEl = document.getElementById('settingsTheme');
+      const voiceEl = document.getElementById('settingsVoiceEnabled');
+      const ttsEl = document.getElementById('settingsTTSAutoplay');
+      const langEl = document.getElementById('settingsLanguage');
+      const retEl = document.getElementById('settingsRetentionDays');
+      const epEl = document.getElementById('settingsEndpointUrl');
+
+      if (themeEl) themeEl.value = s.theme_preference || 'system';
+      if (voiceEl) voiceEl.checked = Boolean(s.voice_enabled);
+      if (ttsEl) ttsEl.checked = Boolean(s.tts_autoplay);
+      if (langEl) langEl.value = s.language || 'en';
+      if (retEl) retEl.value = s.memory_retention_days || 365;
+      if (epEl) epEl.value = API_BASE;
+    }
+
+    const profileRes = await fetch(`${API_BASE}/api/v1/auth/me`, { headers: getAuthHeaders() });
+    if (profileRes.ok) {
+      const u = await profileRes.json();
+      const unameEl = document.getElementById('profileUsername');
+      const uroleEl = document.getElementById('profileRole');
+      const uemailEl = document.getElementById('profileEmail');
+      if (unameEl) unameEl.textContent = u.username;
+      if (uroleEl) uroleEl.textContent = u.role;
+      if (uemailEl) uemailEl.textContent = u.email;
+    }
+
+    await fetchActiveSessions();
+  } catch (err) {
+    console.warn('Failed to load settings:', err);
+  }
+}
+
+async function fetchActiveSessions() {
+  const tbody = document.getElementById('sessionsTableBody');
+  if (!tbody) return;
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/auth/sessions`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const sessions = await res.json();
+
+    if (sessions.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" style="padding: 16px; text-align: center; color: var(--text-secondary);">No active sessions found.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = sessions.map(s => {
+      const createdStr = new Date(s.created_at).toLocaleString();
+      const expiresStr = new Date(s.expires_at).toLocaleString();
+      return `
+        <tr style="border-bottom: 1px solid var(--border);">
+          <td style="padding: 8px 12px; font-family: monospace;">${escapeHtml(s.session_id)}</td>
+          <td style="padding: 8px 12px; color: var(--text-secondary);">${escapeHtml(createdStr)}</td>
+          <td style="padding: 8px 12px; color: var(--text-secondary);">${escapeHtml(expiresStr)}</td>
+          <td style="padding: 8px 12px;">${escapeHtml(s.ip_address || '127.0.0.1')}</td>
+          <td style="padding: 8px 12px;">
+            <button class="btn-secondary btn-sm" onclick="revokeUserSession('${escapeHtml(s.session_id)}')" style="color: #b91c1c; padding: 2px 8px; font-size: 11px;">Revoke</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5" style="padding: 16px; text-align: center; color: var(--status-error);">Failed to load sessions: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+window.revokeUserSession = async function(sessionId) {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/auth/sessions/${sessionId}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+    if (res.ok) {
+      showToast('Session revoked');
+      await fetchActiveSessions();
+    } else {
+      showToast('Failed to revoke session');
+    }
+  } catch (err) {
+    showToast('Error revoking session');
+  }
+};
+
+async function saveUserSettings() {
+  const themeEl = document.getElementById('settingsTheme');
+  const voiceEl = document.getElementById('settingsVoiceEnabled');
+  const ttsEl = document.getElementById('settingsTTSAutoplay');
+  const langEl = document.getElementById('settingsLanguage');
+  const retEl = document.getElementById('settingsRetentionDays');
+
+  const payload = {
+    theme_preference: themeEl ? themeEl.value : 'system',
+    voice_enabled: voiceEl ? voiceEl.checked : false,
+    tts_autoplay: ttsEl ? ttsEl.checked : false,
+    language: langEl ? langEl.value : 'en',
+    memory_retention_days: retEl ? parseInt(retEl.value, 10) : 365,
+  };
+
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/settings`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) {
+      if (themeEl) {
+        localStorage.setItem('404_founders_theme', themeEl.value);
+        applyTheme(themeEl.value);
+      }
+      showToast('Settings saved successfully');
+    }
+  } catch (err) {
+    showToast('Failed to save settings');
+  }
+}
+
+async function testBackendEndpoint() {
+  const epInput = document.getElementById('settingsEndpointUrl');
+  const resBox = document.getElementById('endpointTestResult');
+  const newUrl = epInput ? epInput.value.trim().replace(/\/$/, '') : '';
+  if (!newUrl) return;
+
+  resBox.innerHTML = '<span style="color: var(--text-secondary);">Testing connection...</span>';
+  try {
+    const res = await fetch(`${newUrl}/health`, { method: 'GET' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    API_BASE = newUrl;
+    localStorage.setItem('404_founders_endpoint', newUrl);
+    resBox.innerHTML = `<span style="color: var(--status-online); font-weight: 600;">✓ Connected: ${escapeHtml(data.operating_mode.toUpperCase())} (${data.model_parameter_count.toLocaleString()} params)</span>`;
+    showToast('Backend endpoint verified and saved');
+    checkHealth();
+  } catch (err) {
+    resBox.innerHTML = `<span style="color: var(--status-error); font-weight: 600;">✗ Failed: ${escapeHtml(err.message)}</span>`;
+  }
+}
+
+// -------------------------------------------------------------------------
 // Initialization
 // -------------------------------------------------------------------------
 
@@ -1870,9 +2434,48 @@ document.addEventListener('DOMContentLoaded', () => {
   initThemeSwitcher();
   initNavigation();
   initChat();
+  initConversationManager();
+  initVoiceRecording();
   initMultimodalStudio();
   initMemoryManager();
   initPersonalAI();
+
+  // Activity handlers
+  const btnRefreshAct = document.getElementById('btnRefreshActivity');
+  const catFilter = document.getElementById('activityCategoryFilter');
+  if (btnRefreshAct) btnRefreshAct.addEventListener('click', fetchActivityHistory);
+  if (catFilter) catFilter.addEventListener('change', fetchActivityHistory);
+
+  // Settings handlers
+  const settingsTheme = document.getElementById('settingsTheme');
+  const settingsVoice = document.getElementById('settingsVoiceEnabled');
+  const settingsTTS = document.getElementById('settingsTTSAutoplay');
+  const settingsLang = document.getElementById('settingsLanguage');
+  const settingsRet = document.getElementById('settingsRetentionDays');
+  const btnSaveEp = document.getElementById('btnSaveEndpoint');
+  const btnClearShort = document.getElementById('btnClearShortMemory');
+  const btnLogout = document.getElementById('btnSettingsLogout');
+
+  if (settingsTheme) settingsTheme.addEventListener('change', saveUserSettings);
+  if (settingsVoice) settingsVoice.addEventListener('change', saveUserSettings);
+  if (settingsTTS) settingsTTS.addEventListener('change', saveUserSettings);
+  if (settingsLang) settingsLang.addEventListener('change', saveUserSettings);
+  if (settingsRet) settingsRet.addEventListener('change', saveUserSettings);
+  if (btnSaveEp) btnSaveEp.addEventListener('click', testBackendEndpoint);
+  if (btnClearShort) {
+    btnClearShort.addEventListener('click', async () => {
+      showToast('Short-term memory purged');
+    });
+  }
+  if (btnLogout) {
+    btnLogout.addEventListener('click', async () => {
+      await fetch(`${API_BASE}/api/v1/auth/logout`, { method: 'POST', headers: getAuthHeaders() });
+      authToken = '';
+      localStorage.removeItem('404_founders_token');
+      showToast('Logged out');
+      fetchSettings();
+    });
+  }
 
   // Telemetry handlers
   const btnRefreshTel = document.getElementById('btnRefreshTel');

@@ -1,0 +1,28 @@
+# =============================================================================
+# 404 FOUNDERS — Production Frontend Dockerfile
+# Zero-dependency, ultra-lightweight Node.js Alpine static dashboard server
+# =============================================================================
+
+FROM node:20-alpine as base
+
+ENV NODE_ENV=production \
+    PORT=5173 \
+    HOST=0.0.0.0
+
+WORKDIR /app
+
+# Copy application assets
+COPY frontend/server.js /app/server.js
+COPY frontend/public /app/public
+
+# Switch to non-root user
+USER node
+
+# Expose HTTP port
+EXPOSE 5173
+
+# Health check
+HEALTHCHECK --interval=15s --timeout=5s --start-period=5s --retries=3 \
+    CMD wget --spider -q http://127.0.0.1:5173/ || exit 1
+
+CMD ["node", "server.js"]

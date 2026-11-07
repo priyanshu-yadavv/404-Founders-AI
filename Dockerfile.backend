@@ -1,0 +1,66 @@
+# =============================================================================
+# 404 FOUNDERS — Production Backend Dockerfile
+# Container image for FastAPI REST, WebSocket streaming, and gRPC services
+# =============================================================================
+
+FROM python:3.11-slim as base
+
+# Set environment invariants
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PORT=8000 \
+    GRPC_PORT=50051 \
+    FOUNDERS_ENV=production
+
+# Install security updates and runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    build-essential \
+    libsqlite3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create unprivileged system group and user
+RUN groupadd -g 1001 founders && \
+    useradd -u 1001 -g founders -s /bin/bash -m founders
+
+WORKDIR /app
+
+# Install PyTorch CPU first to leverage Docker layer caching
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+
+# Copy project dependency specification
+COPY pyproject.toml /app/
+
+# Install core and API dependencies
+RUN pip install --no-cache-dir \
+    "fastapi>=0.110.0" \
+    "uvicorn[standard]>=0.28.0" \
+    "websockets>=12.0" \
+    "pydantic>=2.6.0" \
+    "pyyaml>=6.0" \
+    "psutil>=5.9.0" \
+    "scipy>=1.12.0" \
+    "numpy>=1.26.0" \
+    "httpx>=0.27.0"
+
+# Copy full application source code
+COPY . /app
+
+# Ensure proper directory permissions for data and logs
+RUN mkdir -p /app/data /app/logs && \
+    chown -R founders:founders /app
+
+# Switch to unprivileged execution user
+USER founders
+
+# Expose REST/WebSocket and gRPC service ports
+EXPOSE 8000 50051
+
+# Container health probe
+HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://127.0.0.1:8000/health || exit 1
+
+# Production ASGI server launch
+CMD ["uvicorn", "api.rest.app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2", "--log-level", "info"]

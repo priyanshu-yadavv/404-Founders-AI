@@ -130,7 +130,95 @@ MIGRATIONS: List[Tuple[int, str, str]] = [
         CREATE INDEX IF NOT EXISTS idx_feedback_user_status ON feedback_records(user_id, status);
         CREATE INDEX IF NOT EXISTS idx_audit_user_action ON memory_audit_logs(user_id, action, timestamp);
         """
-    )
+    ),
+    (
+        2,
+        "User Authentication, Sessions, Conversations, Settings and Activity Logging Schema",
+        """
+        -- User accounts for secure local authentication
+        CREATE TABLE IF NOT EXISTS user_accounts (
+            id TEXT PRIMARY KEY,
+            username TEXT UNIQUE NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            salt TEXT NOT NULL,
+            display_name TEXT,
+            role TEXT DEFAULT 'USER',
+            is_active INTEGER DEFAULT 1,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            last_login_at TEXT
+        );
+
+        -- Active user authenticated sessions
+        CREATE TABLE IF NOT EXISTS user_sessions (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            token_hash TEXT UNIQUE NOT NULL,
+            created_at TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            ip_address TEXT,
+            user_agent TEXT,
+            is_revoked INTEGER DEFAULT 0,
+            FOREIGN KEY (user_id) REFERENCES user_accounts(id) ON DELETE CASCADE
+        );
+
+        -- Multi-turn conversation threads
+        CREATE TABLE IF NOT EXISTS conversation_threads (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            title TEXT NOT NULL,
+            mode TEXT DEFAULT 'GENERAL',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            metadata_json TEXT,
+            FOREIGN KEY (user_id) REFERENCES user_accounts(id) ON DELETE CASCADE
+        );
+
+        -- Conversation messages
+        CREATE TABLE IF NOT EXISTS conversation_messages (
+            id TEXT PRIMARY KEY,
+            conversation_id TEXT NOT NULL,
+            sender TEXT NOT NULL,
+            content TEXT NOT NULL,
+            message_type TEXT DEFAULT 'TEXT',
+            metadata_json TEXT,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (conversation_id) REFERENCES conversation_threads(id) ON DELETE CASCADE
+        );
+
+        -- User application settings and preferences
+        CREATE TABLE IF NOT EXISTS user_application_settings (
+            user_id TEXT PRIMARY KEY,
+            theme_preference TEXT DEFAULT 'system',
+            language TEXT DEFAULT 'en',
+            voice_enabled INTEGER DEFAULT 0,
+            tts_autoplay INTEGER DEFAULT 0,
+            memory_retention_days INTEGER DEFAULT 365,
+            custom_endpoint_url TEXT,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES user_accounts(id) ON DELETE CASCADE
+        );
+
+        -- Unified task and activity history log
+        CREATE TABLE IF NOT EXISTS activity_log_entries (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            category TEXT NOT NULL,
+            action TEXT NOT NULL,
+            status TEXT NOT NULL,
+            detail TEXT,
+            created_at TEXT NOT NULL
+        );
+
+        -- Indexes for high-throughput queries
+        CREATE INDEX IF NOT EXISTS idx_sessions_token ON user_sessions(token_hash);
+        CREATE INDEX IF NOT EXISTS idx_sessions_user_active ON user_sessions(user_id, is_revoked, expires_at);
+        CREATE INDEX IF NOT EXISTS idx_threads_user ON conversation_threads(user_id, updated_at);
+        CREATE INDEX IF NOT EXISTS idx_messages_conversation ON conversation_messages(conversation_id, created_at);
+        CREATE INDEX IF NOT EXISTS idx_activity_user_cat ON activity_log_entries(user_id, category, created_at);
+        """
+    ),
 ]
 
 
